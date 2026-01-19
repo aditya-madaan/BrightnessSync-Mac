@@ -1,69 +1,46 @@
 #!/bin/bash
 
-# Build script for BrightnessSync
+# Build script for BrightnessSync Mac
 # This creates a proper app bundle and DMG for distribution
 
 set -e
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BUILD_DIR="$PROJECT_DIR/build"
-APP_NAME="BrightnessSync"
+APP_NAME="BrightnessSync Mac"
+EXECUTABLE_NAME="BrightnessSyncMac"
 APP_BUNDLE="$BUILD_DIR/$APP_NAME.app"
-DMG_NAME="$APP_NAME.dmg"
+DMG_NAME="BrightnessSyncMac.dmg"
 
 echo "🔨 Building $APP_NAME..."
 
 # Create build directory
+rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 mkdir -p "$APP_BUNDLE/Contents/MacOS"
 mkdir -p "$APP_BUNDLE/Contents/Resources"
+
+# Copy Info.plist
+cp "$PROJECT_DIR/BrightnessSyncMac/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
 
 # Compile Swift files
 echo "📦 Compiling Swift sources..."
 swiftc -sdk $(xcrun --show-sdk-path) \
        -target arm64-apple-macosx12.0 \
        -O \
-       -o "$APP_BUNDLE/Contents/MacOS/$APP_NAME" \
-       "$PROJECT_DIR/BrightnessSync/"*.swift \
+       -o "$APP_BUNDLE/Contents/MacOS/$EXECUTABLE_NAME" \
+       "$PROJECT_DIR/BrightnessSyncMac/"*.swift \
        -framework AppKit \
        -framework IOKit \
        -framework CoreGraphics \
-       -framework Carbon
-
-# Create Info.plist
-echo "📝 Creating Info.plist..."
-cat > "$APP_BUNDLE/Contents/Info.plist" << 'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleDevelopmentRegion</key>
-    <string>en</string>
-    <key>CFBundleExecutable</key>
-    <string>BrightnessSync</string>
-    <key>CFBundleIdentifier</key>
-    <string>com.brightness.sync</string>
-    <key>CFBundleInfoDictionaryVersion</key>
-    <string>6.0</string>
-    <key>CFBundleName</key>
-    <string>BrightnessSync</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
-    <key>CFBundleVersion</key>
-    <string>1</string>
-    <key>LSMinimumSystemVersion</key>
-    <string>12.0</string>
-    <key>LSUIElement</key>
-    <true/>
-    <key>NSHighResolutionCapable</key>
-    <true/>
-</dict>
-</plist>
-EOF
+       -framework Carbon \
+       -framework ApplicationServices
 
 echo "✅ App bundle created: $APP_BUNDLE"
+
+# Ad-hoc code signing to help with local execution
+echo "✍️  Signing app (ad-hoc)..."
+codesign --force --deep --sign - "$APP_BUNDLE"
 
 # Create DMG
 echo "💿 Creating DMG..."

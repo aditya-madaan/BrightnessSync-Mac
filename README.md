@@ -1,4 +1,4 @@
-# BrightnessSync ☀️
+# BrightnessSync Mac ☀️
 
 A lightweight macOS menu bar app to control your MacBook and external monitor brightness together with calibrated sync.
 
@@ -8,8 +8,9 @@ A lightweight macOS menu bar app to control your MacBook and external monitor br
 
 ## Features
 
-- 🌞 **Unified brightness control** - Single slider syncs brightness across all displays
+- ☀️ **Unified brightness control** - Single slider syncs brightness across all displays
 - ⌨️ **Keyboard shortcuts** - Option+F1/F2 to quickly adjust brightness
+- 🔐 **Auto-Permissions** - Prompts for Accessibility access automatically
 - 🎚️ **Calibrated sync** - Maps brightness levels so displays match visually
 - 💡 **Built-in display support** - Native brightness control via DisplayServices
 - 🖥️ **External monitor support** - DDC/CI via m1ddc for hardware brightness
@@ -17,15 +18,20 @@ A lightweight macOS menu bar app to control your MacBook and external monitor br
 
 ## Installation
 
-### Download DMG
+### 1. Download DMG
 Download the latest release from the [Releases](../../releases) page.
 
-### Build from Source
+### 2. Install
+Open `BrightnessSyncMac.dmg` and drag the app to your Applications folder.
+
+### 3. Bypass "App is Damaged" Warning
+Since this app is not signed with a paid Apple Developer ID, macOS (Gatekeeper) may show an error that **"BrightnessSync Mac is damaged and can't be opened."**
+
+To fix this, open Terminal and run this command:
 ```bash
-git clone https://github.com/YOUR_USERNAME/BrightnessSync.git
-cd BrightnessSync
-./build.sh
+xattr -cr "/Applications/BrightnessSync Mac.app"
 ```
+Then you can run the app normally!
 
 ## Requirements
 
@@ -39,9 +45,9 @@ cd BrightnessSync
 ## Usage
 
 1. **Run the app** - A ☀️ icon appears in your menu bar
-2. **Click the icon** - Shows a brightness slider
-3. **Drag the slider** - Adjusts brightness on all displays
-4. **Use keyboard shortcuts** - ⌥F1 (decrease) / ⌥F2 (increase)
+2. **Grant Permissions** - The app will ask for Accessibility access (needed for keyboard shortcuts)
+3. **Use the Slider** - Click the icon to adjust brightness
+4. **Use Shortcuts** - ⌥F1 (decrease) / ⌥F2 (increase)
 
 ## Keyboard Shortcuts
 
@@ -50,38 +56,20 @@ cd BrightnessSync
 | ⌥ Option + F1 | Decrease brightness by 10% |
 | ⌥ Option + F2 | Increase brightness by 10% |
 
-> **Note**: Keyboard shortcuts require Accessibility permissions.  
-> Go to **System Settings → Privacy & Security → Accessibility** and add BrightnessSync.
-
-## Brightness Calibration
-
-The app includes built-in calibration to match displays with different brightness ranges:
-
-| Slider | MacBook | External Monitor |
-|--------|---------|------------------|
-| 0% | 20% | 0% |
-| 50% | 50% | 50% |
-| 100% | 80% | 100% |
-
-This ensures:
-- MacBook doesn't go pitch black at minimum
-- MacBook doesn't overpower the monitor at maximum
-
-You can customize these values in `BrightnessController.swift`.
-
 ## How It Works
 
 - **MacBook display**: Uses Apple's DisplayServices private framework
 - **External monitors**: Uses [m1ddc](https://github.com/waydabber/m1ddc) for DDC/CI control
+- **Permissions**: Polling mechanism detects when Accessibility is granted to enable shortcuts
 
 ## Project Structure
 
 ```
-BrightnessSync/
-├── BrightnessSync/
+BrightnessSyncMac/
+├── BrightnessSyncMac/
 │   ├── main.swift              # App entry point
-│   ├── AppDelegate.swift       # Menu bar UI + keyboard shortcuts
-│   ├── BrightnessController.swift  # Brightness management + calibration
+│   ├── AppDelegate.swift       # Menu bar UI + logic
+│   ├── BrightnessController.swift  # Brightness management
 │   ├── DDCControl.swift        # External monitor via m1ddc
 │   └── DisplayManager.swift    # Display enumeration
 ├── build.sh                    # Build script
@@ -91,8 +79,3 @@ BrightnessSync/
 ## License
 
 MIT License - see [LICENSE](LICENSE)
-
-## Acknowledgments
-
-- [m1ddc](https://github.com/waydabber/m1ddc) - DDC control for Apple Silicon
-- [MonitorControl](https://github.com/MonitorControl/MonitorControl) - Inspiration for the project
