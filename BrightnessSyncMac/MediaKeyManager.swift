@@ -11,19 +11,15 @@ class MediaKeyManager {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     
-    // NX Keycodes (from IOKit/hidsystem/ev_keymap.h)
+    // NX Keycodes
     private let NX_KEYTYPE_BRIGHTNESS_UP: Int32 = 2
     private let NX_KEYTYPE_BRIGHTNESS_DOWN: Int32 = 3
     
-    // CGEventType.nxSystemDefined is not exposed in Swift directly as a named case easily, 
-    // but likely maps to .tapDisabledByTimeout (val 0xFFFFFFFE) ? No.
-    // We use the raw value 14 which is defined in CGEventTypes.h as kCGEventNXSystemDefined
-    private let kCGEventNXSystemDefined = CGEventType(rawValue: 14)!
+    // CGEventType.nxSystemDefined value
+    private let kCGEventNXSystemDefined: CGEventType = CGEventType(rawValue: 14)!
     
     func start() {
         // Create an event tap to intercept system keys
-        // We capture at the HID level to block the system default beeps/actions
-        
         let eventMask = (1 << kCGEventNXSystemDefined.rawValue)
         
         guard let tap = CGEvent.tapCreate(
@@ -38,13 +34,12 @@ class MediaKeyManager {
             },
             userInfo: Unmanaged.passUnretained(self).toOpaque()
         ) else {
-            print("MediaKeyManager: Failed to create event tap (Requires Accessibility)")
+            print("MediaKeyManager: Failed to create event tap")
             return
         }
         
         self.eventTap = tap
         
-        // Add to run loop
         let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
         self.runLoopSource = source
         CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
@@ -66,50 +61,48 @@ class MediaKeyManager {
     }
     
     private func handleEvent(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            print("MediaKeyManager: Tap disabled, re-enabling...")
+            if let tap = self.eventTap {
+                CGEvent.tapEnable(tap: tap, enable: true)
+            }
+            return Unmanaged.passUnretained(event)
+        }
+        
         if type == kCGEventNXSystemDefined {
-            // Get event data
-            // The 16-32 bits contain the keycode for system events
-            // We use integer value field 0 (data1)
-            let data1 = event.getIntegerValueField(.eventSourceUserData) // This usually holds the data for system events
-            
-            // Actually, for NSEvent/CGEvent system defined:
-            // Field 1 (data1) contains the keycode info
-            // In CoreGraphics Swift API, we might need to rely on the NSEvent wrapper to parse it easily, 
-            // but we can't create NSEvent from CGEvent in this context safely/performantly always?
-            // Actually we can:
+            // Use NSEvent to parse the system defined event data easily
             if let nsEvent = NSEvent(cgEvent: event) {
-                if nsEvent.type == .systemDefined && nsEvent.subtype.rawValue == 8 {
+                // Check if it is a system defined special key event (subtype 8)
+                if nsEvent.subtype.rawValue == 8 {
                     let data = nsEvent.data1
                     let keyCode = (data & 0xFFFF0000) >> 16
                     let keyFlags = (data & 0x0000FFFF)
-                    let keyState = (keyFlags & 0xFF00) >> 8 // 0xA press, 0xB release
+                    let keyState = (keyFlags & 0xFF00) >> 8
                     let isRepeat = (keyFlags & 0x1) > 0
                     
                     if Int32(keyCode) == NX_KEYTYPE_BRIGHTNESS_UP || Int32(keyCode) == NX_KEYTYPE_BRIGHTNESS_DOWN {
-                        if keyState == 0xA { // Key Down
+                        
+                        // Key Down (0xA) or Key Repeat
+                        if keyState == 0xA {
                             let isUp = Int32(keyCode) == NX_KEYTYPE_BRIGHTNESS_UP
                             
+                            // Perform action on main thread
                             DispatchQueue.main.async { [weak self] in
                                 self?.delegate?.handleBrightnessEvent(up: isUp, isRepeat: isRepeat)
                             }
                             
-                            // Return nil to suppress the event
+                            // Return nil to SUPPRESS the event so macOS doesn't show its overlay
+                            // or change the native brightness on top of our change
+                            print("MediaKeyManager: Intercepted brightness key")
                             return nil
                         }
                         
-                        // Also consume key up
+                        // Key Up (0xB) - also suppress to finish the stroke cleanly
                         if keyState == 0xB {
                             return nil
                         }
                     }
                 }
-            }
-        }
-        
-        // Re-enable if disabled
-        if type == .tapDisabledByTimeout {
-            if let tap = self.eventTap {
-                CGEvent.tapEnable(tap: tap, enable: true)
             }
         }
         
