@@ -2,16 +2,15 @@ import Cocoa
 import Carbon.HIToolbox
 import ApplicationServices
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, MediaKeyDelegate {
     
     private var statusItem: NSStatusItem!
     private var brightnessController: BrightnessController!
     private var sliderView: BrightnessSliderView!
-    private var eventMonitor: Any?
-    private var localEventMonitor: Any?
+    private var mediaKeyManager: MediaKeyManager!
     
-    // Brightness step for keyboard shortcuts (10%)
-    private let brightnessStep: Float = 0.1
+    // Brightness step (10% normally, 2.5% with Shift+Option like native macOS)
+    private let brightnessStep: Float = 0.0625 // 1/16th like native macOS
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         print("BrightnessSync: App launching...")
@@ -34,31 +33,55 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Create menu
         setupMenu()
         
-        // Check and request accessibility permissions
+        // Initialize Media Key Manager
+        mediaKeyManager = MediaKeyManager()
+        mediaKeyManager.delegate = self
+        
+        // Check permissions and start
         checkAccessibilityPermissions()
+        
+        // Monitor for display changes (plug/unplug)
+        monitorDisplayChanges()
         
         print("BrightnessSync: Ready!")
     }
     
-    func applicationWillTerminate(_ notification: Notification) {
-        // Remove event monitors
-        if let monitor = eventMonitor {
-            NSEvent.removeMonitor(monitor)
+    private func monitorDisplayChanges() {
+        CGDisplayRegisterReconfigurationCallback({ (displayId, flags, userInfo) in
+            guard let userInfo = userInfo else { return }
+            let delegate = Unmanaged<AppDelegate>.fromOpaque(userInfo).takeUnretainedValue()
+            
+            if flags.contains(.addFlag) || flags.contains(.removeFlag) || flags.contains(.enabledFlag) {
+                print("BrightnessSync: Display configuration changed")
+                DispatchQueue.main.async {
+                    delegate.handleDisplayChange()
+                }
+            }
+        }, Unmanaged.passUnretained(self).toOpaque())
+    }
+    
+    func handleDisplayChange() {
+        // Refresh display list and update CLI/UI
+        print("BrightnessSync: Refreshing displays...")
+        if let menu = statusItem.menu,
+           let infoItem = menu.items.first(where: { $0.title.contains("display") }) {
+            let displayCount = brightnessController.getDisplayCount()
+            infoItem.title = "\(displayCount) display(s) connected"
         }
-        if let monitor = localEventMonitor {
-            NSEvent.removeMonitor(monitor)
-        }
+        
+        // Re-apply current brightness to ensure new monitors get synced immediately
+        let current = brightnessController.getBrightness()
+        brightnessController.setBrightness(current)
     }
     
     // MARK: - Accessibility Permissions
     
     private func checkAccessibilityPermissions() {
-        // Check if we already have accessibility access
         let trusted = AXIsProcessTrusted()
         
         if trusted {
             print("BrightnessSync: Accessibility access granted ✓")
-            setupKeyboardShortcuts()
+            mediaKeyManager.start()
         } else {
             print("BrightnessSync: Requesting accessibility access...")
             promptForAccessibility()
@@ -66,17 +89,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func promptForAccessibility() {
-        // This will show the system prompt to enable accessibility
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         let accessEnabled = AXIsProcessTrustedWithOptions(options)
         
         if accessEnabled {
-            setupKeyboardShortcuts()
+            mediaKeyManager.start()
         } else {
-            // Show alert explaining why we need it
             showAccessibilityAlert()
-            
-            // Start polling to check when user grants permission
             startAccessibilityPolling()
         }
     }
@@ -84,14 +103,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func showAccessibilityAlert() {
         let alert = NSAlert()
         alert.messageText = "Accessibility Access Required"
-        alert.informativeText = "BrightnessSync needs Accessibility access to use keyboard shortcuts (Option+F1/F2).\n\nPlease enable it in System Settings → Privacy & Security → Accessibility.\n\nThe brightness slider will still work without this permission."
+        alert.informativeText = "BrightnessSync needs Accessibility access to detect native brightness keys (F1/F2) and suppress system defaults.\n\nPlease enable it in System Settings → Privacy & Security → Accessibility."
         alert.alertStyle = .informational
         alert.addButton(withTitle: "Open System Settings")
         alert.addButton(withTitle: "Later")
         
         let response = alert.runModal()
         if response == .alertFirstButtonReturn {
-            // Open System Preferences to Accessibility
             if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
                 NSWorkspace.shared.open(url)
             }
@@ -99,13 +117,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func startAccessibilityPolling() {
-        // Check every 2 seconds if user has granted permission
         Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] timer in
             if AXIsProcessTrusted() {
                 timer.invalidate()
                 print("BrightnessSync: Accessibility access granted ✓")
                 DispatchQueue.main.async {
-                    self?.setupKeyboardShortcuts()
+                    self?.mediaKeyManager.start()
                     self?.updateMenuWithShortcutStatus(enabled: true)
                 }
             }
@@ -114,49 +131,55 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     private func updateMenuWithShortcutStatus(enabled: Bool) {
         if let menu = statusItem.menu,
-           let shortcutItem = menu.items.first(where: { $0.title.contains("F1") || $0.title.contains("F2") }) {
-            shortcutItem.title = enabled ? "⌥F1 / ⌥F2 to adjust ✓" : "⌥F1 / ⌥F2 (needs permissions)"
+           let shortcutItem = menu.items.first(where: { $0.title.contains("Native") || $0.title.contains("keys") }) {
+            shortcutItem.title = enabled ? "Native F1/F2 keys active ✓" : "Native keys (needs permissions)"
         }
+    }
+    
+    // MARK: - MediaKeyDelegate
+    
+    func handleBrightnessEvent(up: Bool, isRepeat: Bool) {
+        let current = brightnessController.getBrightness()
+        
+        // Shift+Option+F1/F2 usually does smaller steps, simple F1/F2 does standard
+        // For now using 6.25% (1/16) which is standard macOS step
+        let step = brightnessStep
+        
+        let newLevel = up ? min(1.0, current + step) : max(0.0, current - step)
+        
+        brightnessController.setBrightness(newLevel)
+        sliderView.updateSlider()
+        showBrightnessOSD(level: newLevel)
     }
     
     private func setupMenu() {
         let menu = NSMenu()
         
-        // Header
-        let headerItem = NSMenuItem(title: "BrightnessSync", action: nil, keyEquivalent: "")
+        let headerItem = NSMenuItem(title: "BrightnessSync Mac", action: nil, keyEquivalent: "")
         headerItem.isEnabled = false
         menu.addItem(headerItem)
-        
-        // Separator
         menu.addItem(NSMenuItem.separator())
         
-        // Add slider view as menu item
         let sliderItem = NSMenuItem()
         sliderView = BrightnessSliderView(frame: NSRect(x: 0, y: 0, width: 250, height: 50))
         sliderView.brightnessController = brightnessController
         sliderView.updateSlider()
         sliderItem.view = sliderView
         menu.addItem(sliderItem)
-        
-        // Separator
         menu.addItem(NSMenuItem.separator())
         
-        // Shortcuts info
-        let shortcutStatus = AXIsProcessTrusted() ? "⌥F1 / ⌥F2 to adjust ✓" : "⌥F1 / ⌥F2 (needs permissions)"
+        let shortcutStatus = AXIsProcessTrusted() ? "Native F1/F2 keys active ✓" : "Native keys (needs permissions)"
         let shortcutInfo = NSMenuItem(title: shortcutStatus, action: nil, keyEquivalent: "")
         shortcutInfo.isEnabled = false
         menu.addItem(shortcutInfo)
         
-        // Display info
         let displayCount = brightnessController.getDisplayCount()
         let infoItem = NSMenuItem(title: "\(displayCount) display(s) connected", action: nil, keyEquivalent: "")
         infoItem.isEnabled = false
         menu.addItem(infoItem)
         
-        // Separator
         menu.addItem(NSMenuItem.separator())
         
-        // Quit option
         let quitItem = NSMenuItem(title: "Quit BrightnessSync", action: #selector(quitApp), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
@@ -165,63 +188,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.delegate = self
     }
     
-    private func setupKeyboardShortcuts() {
-        // Only setup if not already done
-        guard eventMonitor == nil else { return }
-        
-        // Use global event monitor for Option+F1 and Option+F2
-        eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            self?.handleKeyEvent(event)
-        }
-        
-        // Also monitor local events (when app is focused)
-        localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            self?.handleKeyEvent(event)
-            return event
-        }
-        
-        print("BrightnessSync: Keyboard shortcuts enabled (⌥F1/F2)")
-        updateMenuWithShortcutStatus(enabled: true)
-    }
-    
-    private func handleKeyEvent(_ event: NSEvent) {
-        // Check for Option modifier
-        guard event.modifierFlags.contains(.option) else { return }
-        
-        switch event.keyCode {
-        case 122: // F1 key
-            decreaseBrightness()
-        case 120: // F2 key
-            increaseBrightness()
-        default:
-            break
-        }
-    }
-    
-    private func increaseBrightness() {
-        let current = brightnessController.getBrightness()
-        let newLevel = min(1.0, current + brightnessStep)
-        brightnessController.setBrightness(newLevel)
-        sliderView.updateSlider()
-        showBrightnessOSD(level: newLevel)
-        print("BrightnessSync: Brightness increased to \(Int(newLevel * 100))%")
-    }
-    
-    private func decreaseBrightness() {
-        let current = brightnessController.getBrightness()
-        let newLevel = max(0.0, current - brightnessStep)
-        brightnessController.setBrightness(newLevel)
-        sliderView.updateSlider()
-        showBrightnessOSD(level: newLevel)
-        print("BrightnessSync: Brightness decreased to \(Int(newLevel * 100))%")
-    }
-    
     private func showBrightnessOSD(level: Float) {
         if let button = statusItem.button {
             let percentage = Int(level * 100)
             button.title = "\(percentage)%"
-            
-            // Reset to icon after 1 second
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                 if let image = NSImage(systemSymbolName: "sun.max.fill", accessibilityDescription: "Brightness") {
                     button.title = ""
@@ -242,7 +212,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 extension AppDelegate: NSMenuDelegate {
     func menuWillOpen(_ menu: NSMenu) {
         sliderView.updateSlider()
-        
         if let infoItem = menu.items.first(where: { $0.title.contains("display") }) {
             let displayCount = brightnessController.getDisplayCount()
             infoItem.title = "\(displayCount) display(s) connected"
@@ -250,8 +219,7 @@ extension AppDelegate: NSMenuDelegate {
     }
 }
 
-// MARK: - BrightnessSliderView
-
+// Slider View Implementation
 class BrightnessSliderView: NSView {
     
     var brightnessController: BrightnessController?
@@ -263,18 +231,6 @@ class BrightnessSliderView: NSView {
         slider.sliderType = .linear
         slider.isContinuous = true
         return slider
-    }()
-    
-    private let lowBrightnessIcon: NSTextField = {
-        let label = NSTextField(labelWithString: "🔅")
-        label.font = NSFont.systemFont(ofSize: 12)
-        return label
-    }()
-    
-    private let highBrightnessIcon: NSTextField = {
-        let label = NSTextField(labelWithString: "🔆")
-        label.font = NSFont.systemFont(ofSize: 12)
-        return label
     }()
     
     private let percentageLabel: NSTextField = {
@@ -290,10 +246,7 @@ class BrightnessSliderView: NSView {
         setupViews()
     }
     
-    required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        setupViews()
-    }
+    required init?(coder: NSCoder) { super.init(coder: coder); setupViews() }
     
     private func setupViews() {
         let iconSize: CGFloat = 16
@@ -301,22 +254,24 @@ class BrightnessSliderView: NSView {
         let spacing: CGFloat = 8
         let labelWidth: CGFloat = 36
         
-        lowBrightnessIcon.frame = NSRect(x: padding, y: (bounds.height - iconSize) / 2, width: iconSize, height: iconSize)
-        addSubview(lowBrightnessIcon)
+        let lowIcon = NSTextField(labelWithString: "🔅")
+        lowIcon.font = .systemFont(ofSize: 12)
+        lowIcon.frame = NSRect(x: padding, y: (bounds.height - iconSize)/2, width: iconSize, height: iconSize)
+        addSubview(lowIcon)
         
         let sliderX = padding + iconSize + spacing
         let sliderWidth = bounds.width - sliderX - spacing - iconSize - spacing - labelWidth - padding
-        slider.frame = NSRect(x: sliderX, y: (bounds.height - 21) / 2, width: sliderWidth, height: 21)
+        slider.frame = NSRect(x: sliderX, y: (bounds.height - 21)/2, width: sliderWidth, height: 21)
         slider.target = self
         slider.action = #selector(sliderChanged(_:))
         addSubview(slider)
         
-        let highIconX = sliderX + sliderWidth + spacing
-        highBrightnessIcon.frame = NSRect(x: highIconX, y: (bounds.height - iconSize) / 2, width: iconSize, height: iconSize)
-        addSubview(highBrightnessIcon)
+        let highIcon = NSTextField(labelWithString: "🔆")
+        highIcon.font = .systemFont(ofSize: 12)
+        highIcon.frame = NSRect(x: sliderX + sliderWidth + spacing, y: (bounds.height - iconSize)/2, width: iconSize, height: iconSize)
+        addSubview(highIcon)
         
-        let labelX = highIconX + iconSize + spacing
-        percentageLabel.frame = NSRect(x: labelX, y: (bounds.height - 16) / 2, width: labelWidth, height: 16)
+        percentageLabel.frame = NSRect(x: highIcon.frame.maxX + spacing, y: (bounds.height - 16)/2, width: labelWidth, height: 16)
         addSubview(percentageLabel)
     }
     
