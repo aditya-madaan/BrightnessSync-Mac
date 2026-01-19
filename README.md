@@ -49,13 +49,6 @@ Then you can run the app normally!
 3. **Use the Slider** - Click the icon to adjust brightness
 4. **Use Shortcuts** - ⌥F1 (decrease) / ⌥F2 (increase)
 
-## Keyboard Shortcuts
-
-| Shortcut | Action |
-|----------|--------|
-| ⌥ Option + F1 | Decrease brightness by 10% |
-| ⌥ Option + F2 | Increase brightness by 10% |
-
 ## How It Works
 
 - **MacBook display**: Uses Apple's DisplayServices private framework
