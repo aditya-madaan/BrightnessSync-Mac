@@ -1,5 +1,6 @@
 import Cocoa
 import Carbon.HIToolbox
+import ApplicationServices
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     
@@ -7,6 +8,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var brightnessController: BrightnessController!
     private var sliderView: BrightnessSliderView!
     private var eventMonitor: Any?
+    private var localEventMonitor: Any?
     
     // Brightness step for keyboard shortcuts (10%)
     private let brightnessStep: Float = 0.1
@@ -32,16 +34,88 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Create menu
         setupMenu()
         
-        // Setup keyboard shortcuts
-        setupKeyboardShortcuts()
+        // Check and request accessibility permissions
+        checkAccessibilityPermissions()
         
-        print("BrightnessSync: Ready! Use Option+F1/F2 to adjust brightness")
+        print("BrightnessSync: Ready!")
     }
     
     func applicationWillTerminate(_ notification: Notification) {
-        // Remove event monitor
+        // Remove event monitors
         if let monitor = eventMonitor {
             NSEvent.removeMonitor(monitor)
+        }
+        if let monitor = localEventMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+    }
+    
+    // MARK: - Accessibility Permissions
+    
+    private func checkAccessibilityPermissions() {
+        // Check if we already have accessibility access
+        let trusted = AXIsProcessTrusted()
+        
+        if trusted {
+            print("BrightnessSync: Accessibility access granted ✓")
+            setupKeyboardShortcuts()
+        } else {
+            print("BrightnessSync: Requesting accessibility access...")
+            promptForAccessibility()
+        }
+    }
+    
+    private func promptForAccessibility() {
+        // This will show the system prompt to enable accessibility
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        let accessEnabled = AXIsProcessTrustedWithOptions(options)
+        
+        if accessEnabled {
+            setupKeyboardShortcuts()
+        } else {
+            // Show alert explaining why we need it
+            showAccessibilityAlert()
+            
+            // Start polling to check when user grants permission
+            startAccessibilityPolling()
+        }
+    }
+    
+    private func showAccessibilityAlert() {
+        let alert = NSAlert()
+        alert.messageText = "Accessibility Access Required"
+        alert.informativeText = "BrightnessSync needs Accessibility access to use keyboard shortcuts (Option+F1/F2).\n\nPlease enable it in System Settings → Privacy & Security → Accessibility.\n\nThe brightness slider will still work without this permission."
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Open System Settings")
+        alert.addButton(withTitle: "Later")
+        
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            // Open System Preferences to Accessibility
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                NSWorkspace.shared.open(url)
+            }
+        }
+    }
+    
+    private func startAccessibilityPolling() {
+        // Check every 2 seconds if user has granted permission
+        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] timer in
+            if AXIsProcessTrusted() {
+                timer.invalidate()
+                print("BrightnessSync: Accessibility access granted ✓")
+                DispatchQueue.main.async {
+                    self?.setupKeyboardShortcuts()
+                    self?.updateMenuWithShortcutStatus(enabled: true)
+                }
+            }
+        }
+    }
+    
+    private func updateMenuWithShortcutStatus(enabled: Bool) {
+        if let menu = statusItem.menu,
+           let shortcutItem = menu.items.first(where: { $0.title.contains("F1") || $0.title.contains("F2") }) {
+            shortcutItem.title = enabled ? "⌥F1 / ⌥F2 to adjust ✓" : "⌥F1 / ⌥F2 (needs permissions)"
         }
     }
     
@@ -68,7 +142,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem.separator())
         
         // Shortcuts info
-        let shortcutInfo = NSMenuItem(title: "⌥F1 / ⌥F2 to adjust", action: nil, keyEquivalent: "")
+        let shortcutStatus = AXIsProcessTrusted() ? "⌥F1 / ⌥F2 to adjust ✓" : "⌥F1 / ⌥F2 (needs permissions)"
+        let shortcutInfo = NSMenuItem(title: shortcutStatus, action: nil, keyEquivalent: "")
         shortcutInfo.isEnabled = false
         menu.addItem(shortcutInfo)
         
@@ -91,16 +166,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func setupKeyboardShortcuts() {
+        // Only setup if not already done
+        guard eventMonitor == nil else { return }
+        
         // Use global event monitor for Option+F1 and Option+F2
         eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             self?.handleKeyEvent(event)
         }
         
         // Also monitor local events (when app is focused)
-        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+        localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             self?.handleKeyEvent(event)
             return event
         }
+        
+        print("BrightnessSync: Keyboard shortcuts enabled (⌥F1/F2)")
+        updateMenuWithShortcutStatus(enabled: true)
     }
     
     private func handleKeyEvent(_ event: NSEvent) {
@@ -136,14 +217,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func showBrightnessOSD(level: Float) {
-        // Show a brief notification-style feedback
-        // We could use a custom OSD window here, but for simplicity we'll just update the menu bar
         if let button = statusItem.button {
             let percentage = Int(level * 100)
             button.title = "\(percentage)%"
             
             // Reset to icon after 1 second
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                 if let image = NSImage(systemSymbolName: "sun.max.fill", accessibilityDescription: "Brightness") {
                     button.title = ""
                     button.image = image
