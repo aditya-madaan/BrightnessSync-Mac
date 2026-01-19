@@ -23,6 +23,18 @@ mkdir -p "$APP_BUNDLE/Contents/Resources"
 # Copy Info.plist
 cp "$PROJECT_DIR/BrightnessSyncMac/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
 
+# Generate App Icon (icns) using iconutil (works with Command Line Tools)
+echo "🎨 Generating App Icon..."
+ICONSET_DIR="$BUILD_DIR/AppIcon.iconset"
+mkdir -p "$ICONSET_DIR"
+
+# Copy icons from xcassets to iconset folder with correct names for iconutil
+# iconutil expects names like: icon_16x16.png, icon_16x16@2x.png, etc.
+cp "$PROJECT_DIR/BrightnessSyncMac/Assets.xcassets/AppIcon.appiconset/"*.png "$ICONSET_DIR/"
+
+# Convert to icns
+iconutil -c icns "$ICONSET_DIR" -o "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
+
 # Compile Swift files
 echo "📦 Compiling Swift sources..."
 swiftc -sdk $(xcrun --show-sdk-path) \
