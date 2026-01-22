@@ -8,17 +8,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, MediaKeyDelegate {
     private var brightnessController: BrightnessController!
     private var sliderView: BrightnessSliderView!
     private var mediaKeyManager: MediaKeyManager!
+    private var settingsWindow: NSWindow?
     
-    // Brightness step (10% normally, 2.5% with Shift+Option like native macOS)
-    private let brightnessStep: Float = 0.0625 // 1/16th like native macOS
+    // Brightness step
+    private let brightnessStep: Float = 0.0625
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         print("BrightnessSync: App launching...")
         
-        // Initialize brightness controller
         brightnessController = BrightnessController()
         
-        // Create status bar item
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
         if let button = statusItem.button {
@@ -30,17 +29,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, MediaKeyDelegate {
             }
         }
         
-        // Create menu
         setupMenu()
         
-        // Initialize Media Key Manager
         mediaKeyManager = MediaKeyManager()
         mediaKeyManager.delegate = self
         
-        // Check permissions and start
         checkAccessibilityPermissions()
-        
-        // Monitor for display changes (plug/unplug)
         monitorDisplayChanges()
         
         print("BrightnessSync: Ready!")
@@ -52,7 +46,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, MediaKeyDelegate {
             let delegate = Unmanaged<AppDelegate>.fromOpaque(userInfo).takeUnretainedValue()
             
             if flags.contains(.addFlag) || flags.contains(.removeFlag) || flags.contains(.enabledFlag) {
-                print("BrightnessSync: Display configuration changed")
                 DispatchQueue.main.async {
                     delegate.handleDisplayChange()
                 }
@@ -61,29 +54,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, MediaKeyDelegate {
     }
     
     func handleDisplayChange() {
-        // Refresh display list and update CLI/UI
-        print("BrightnessSync: Refreshing displays...")
+        print("BrightnessSync: Display changed, syncing...")
         if let menu = statusItem.menu,
            let infoItem = menu.items.first(where: { $0.title.contains("display") }) {
             let displayCount = brightnessController.getDisplayCount()
             infoItem.title = "\(displayCount) display(s) connected"
         }
-        
-        // Re-apply current brightness to ensure new monitors get synced immediately
         let current = brightnessController.getBrightness()
         brightnessController.setBrightness(current)
     }
     
-    // MARK: - Accessibility Permissions
+    // MARK: - Accessibility
     
     private func checkAccessibilityPermissions() {
-        let trusted = AXIsProcessTrusted()
-        
-        if trusted {
-            print("BrightnessSync: Accessibility access granted ✓")
+        if AXIsProcessTrusted() {
+            print("BrightnessSync: Accessibility ✓")
             mediaKeyManager.start()
         } else {
-            print("BrightnessSync: Requesting accessibility access...")
             promptForAccessibility()
         }
     }
@@ -103,13 +90,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, MediaKeyDelegate {
     private func showAccessibilityAlert() {
         let alert = NSAlert()
         alert.messageText = "Accessibility Access Required"
-        alert.informativeText = "BrightnessSync needs Accessibility access to detect native brightness keys (F1/F2) and suppress system defaults.\n\nPlease enable it in System Settings → Privacy & Security → Accessibility."
+        alert.informativeText = "BrightnessSync Mac needs Accessibility access to intercept brightness keys (F1/F2).\n\nPlease enable in System Settings → Privacy & Security → Accessibility."
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "Open System Settings")
+        alert.addButton(withTitle: "Open Settings")
         alert.addButton(withTitle: "Later")
         
-        let response = alert.runModal()
-        if response == .alertFirstButtonReturn {
+        if alert.runModal() == .alertFirstButtonReturn {
             if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
                 NSWorkspace.shared.open(url)
             }
@@ -120,19 +106,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, MediaKeyDelegate {
         Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] timer in
             if AXIsProcessTrusted() {
                 timer.invalidate()
-                print("BrightnessSync: Accessibility access granted ✓")
-                DispatchQueue.main.async {
-                    self?.mediaKeyManager.start()
-                    self?.updateMenuWithShortcutStatus(enabled: true)
-                }
+                self?.mediaKeyManager.start()
+                self?.updateMenuStatus()
             }
         }
     }
     
-    private func updateMenuWithShortcutStatus(enabled: Bool) {
+    private func updateMenuStatus() {
         if let menu = statusItem.menu,
-           let shortcutItem = menu.items.first(where: { $0.title.contains("Native") || $0.title.contains("keys") }) {
-            shortcutItem.title = enabled ? "Native F1/F2 keys active ✓" : "Native keys (needs permissions)"
+           let item = menu.items.first(where: { $0.title.contains("F1") || $0.title.contains("F2") }) {
+            item.title = "Native F1/F2 keys active ✓"
         }
     }
     
@@ -140,17 +123,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, MediaKeyDelegate {
     
     func handleBrightnessEvent(up: Bool, isRepeat: Bool) {
         let current = brightnessController.getBrightness()
+        let newLevel = up ? min(1.0, current + brightnessStep) : max(0.0, current - brightnessStep)
         
-        // Shift+Option+F1/F2 usually does smaller steps, simple F1/F2 does standard
-        // For now using 6.25% (1/16) which is standard macOS step
-        let step = brightnessStep
-        
-        let newLevel = up ? min(1.0, current + step) : max(0.0, current - step)
-        
+        print("BrightnessSync: Key \(up ? "↑" : "↓") → \(Int(newLevel * 100))%")
         brightnessController.setBrightness(newLevel)
-        sliderView.updateSlider()
+        sliderView?.updateSlider()
         showBrightnessOSD(level: newLevel)
     }
+    
+    // MARK: - Menu Setup
     
     private func setupMenu() {
         let menu = NSMenu()
@@ -160,6 +141,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, MediaKeyDelegate {
         menu.addItem(headerItem)
         menu.addItem(NSMenuItem.separator())
         
+        // Slider
         let sliderItem = NSMenuItem()
         sliderView = BrightnessSliderView(frame: NSRect(x: 0, y: 0, width: 250, height: 50))
         sliderView.brightnessController = brightnessController
@@ -168,7 +150,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, MediaKeyDelegate {
         menu.addItem(sliderItem)
         menu.addItem(NSMenuItem.separator())
         
-        let shortcutStatus = AXIsProcessTrusted() ? "Native F1/F2 keys active ✓" : "Native keys (needs permissions)"
+        // Status
+        let shortcutStatus = AXIsProcessTrusted() ? "Native F1/F2 keys active ✓" : "F1/F2 (needs permissions)"
         let shortcutInfo = NSMenuItem(title: shortcutStatus, action: nil, keyEquivalent: "")
         shortcutInfo.isEnabled = false
         menu.addItem(shortcutInfo)
@@ -180,12 +163,131 @@ class AppDelegate: NSObject, NSApplicationDelegate, MediaKeyDelegate {
         
         menu.addItem(NSMenuItem.separator())
         
-        let quitItem = NSMenuItem(title: "Quit BrightnessSync", action: #selector(quitApp), keyEquivalent: "q")
+        // Settings
+        let settingsItem = NSMenuItem(title: "Calibration Settings...", action: #selector(openSettings), keyEquivalent: ",")
+        settingsItem.target = self
+        menu.addItem(settingsItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        // Quit
+        let quitItem = NSMenuItem(title: "Quit", action: #selector(quitApp), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
         
         statusItem.menu = menu
         menu.delegate = self
+    }
+    
+    @objc private func openSettings() {
+        if settingsWindow == nil {
+            createSettingsWindow()
+        }
+        settingsWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+    
+    private func createSettingsWindow() {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 350, height: 200),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "Calibration Settings"
+        window.center()
+        window.isReleasedWhenClosed = false
+        
+        let contentView = NSView(frame: window.contentView!.bounds)
+        
+        // Title
+        let titleLabel = NSTextField(labelWithString: "MacBook Brightness Limits")
+        titleLabel.font = .boldSystemFont(ofSize: 14)
+        titleLabel.frame = NSRect(x: 20, y: 150, width: 300, height: 20)
+        contentView.addSubview(titleLabel)
+        
+        let descLabel = NSTextField(wrappingLabelWithString: "Maps slider 0-100% to these MacBook brightness values:")
+        descLabel.frame = NSRect(x: 20, y: 120, width: 310, height: 30)
+        descLabel.font = .systemFont(ofSize: 11)
+        descLabel.textColor = .secondaryLabelColor
+        contentView.addSubview(descLabel)
+        
+        // Min slider
+        let minLabel = NSTextField(labelWithString: "Minimum (0%):")
+        minLabel.frame = NSRect(x: 20, y: 85, width: 100, height: 20)
+        contentView.addSubview(minLabel)
+        
+        let minSlider = NSSlider(value: Double(brightnessController.macBookCalibration.minBrightness * 100),
+                                  minValue: 0, maxValue: 50,
+                                  target: self, action: #selector(minSliderChanged(_:)))
+        minSlider.frame = NSRect(x: 120, y: 85, width: 150, height: 20)
+        minSlider.tag = 1
+        contentView.addSubview(minSlider)
+        
+        let minValueLabel = NSTextField(labelWithString: "\(Int(brightnessController.macBookCalibration.minBrightness * 100))%")
+        minValueLabel.frame = NSRect(x: 280, y: 85, width: 50, height: 20)
+        minValueLabel.tag = 101
+        contentView.addSubview(minValueLabel)
+        
+        // Max slider
+        let maxLabel = NSTextField(labelWithString: "Maximum (100%):")
+        maxLabel.frame = NSRect(x: 20, y: 50, width: 100, height: 20)
+        contentView.addSubview(maxLabel)
+        
+        let maxSlider = NSSlider(value: Double(brightnessController.macBookCalibration.maxBrightness * 100),
+                                  minValue: 50, maxValue: 100,
+                                  target: self, action: #selector(maxSliderChanged(_:)))
+        maxSlider.frame = NSRect(x: 120, y: 50, width: 150, height: 20)
+        maxSlider.tag = 2
+        contentView.addSubview(maxSlider)
+        
+        let maxValueLabel = NSTextField(labelWithString: "\(Int(brightnessController.macBookCalibration.maxBrightness * 100))%")
+        maxValueLabel.frame = NSRect(x: 280, y: 50, width: 50, height: 20)
+        maxValueLabel.tag = 102
+        contentView.addSubview(maxValueLabel)
+        
+        // Reset button
+        let resetButton = NSButton(title: "Reset to Defaults", target: self, action: #selector(resetCalibration))
+        resetButton.frame = NSRect(x: 20, y: 15, width: 120, height: 25)
+        contentView.addSubview(resetButton)
+        
+        window.contentView = contentView
+        settingsWindow = window
+    }
+    
+    @objc private func minSliderChanged(_ sender: NSSlider) {
+        let value = Float(sender.doubleValue) / 100.0
+        brightnessController.macBookCalibration.minBrightness = value
+        
+        if let label = settingsWindow?.contentView?.viewWithTag(101) as? NSTextField {
+            label.stringValue = "\(Int(sender.doubleValue))%"
+        }
+    }
+    
+    @objc private func maxSliderChanged(_ sender: NSSlider) {
+        let value = Float(sender.doubleValue) / 100.0
+        brightnessController.macBookCalibration.maxBrightness = value
+        
+        if let label = settingsWindow?.contentView?.viewWithTag(102) as? NSTextField {
+            label.stringValue = "\(Int(sender.doubleValue))%"
+        }
+    }
+    
+    @objc private func resetCalibration() {
+        brightnessController.macBookCalibration = BrightnessCalibration(minBrightness: 0.20, maxBrightness: 0.80)
+        
+        if let minSlider = settingsWindow?.contentView?.viewWithTag(1) as? NSSlider {
+            minSlider.doubleValue = 20
+        }
+        if let maxSlider = settingsWindow?.contentView?.viewWithTag(2) as? NSSlider {
+            maxSlider.doubleValue = 80
+        }
+        if let minLabel = settingsWindow?.contentView?.viewWithTag(101) as? NSTextField {
+            minLabel.stringValue = "20%"
+        }
+        if let maxLabel = settingsWindow?.contentView?.viewWithTag(102) as? NSTextField {
+            maxLabel.stringValue = "80%"
+        }
     }
     
     private func showBrightnessOSD(level: Float) {
@@ -211,7 +313,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, MediaKeyDelegate {
 
 extension AppDelegate: NSMenuDelegate {
     func menuWillOpen(_ menu: NSMenu) {
-        sliderView.updateSlider()
+        sliderView?.updateSlider()
         if let infoItem = menu.items.first(where: { $0.title.contains("display") }) {
             let displayCount = brightnessController.getDisplayCount()
             infoItem.title = "\(displayCount) display(s) connected"
@@ -219,7 +321,8 @@ extension AppDelegate: NSMenuDelegate {
     }
 }
 
-// Slider View Implementation
+// MARK: - BrightnessSliderView
+
 class BrightnessSliderView: NSView {
     
     var brightnessController: BrightnessController?

@@ -5,8 +5,8 @@ import CoreGraphics
 
 /// Brightness calibration settings for each display type
 struct BrightnessCalibration {
-    let minBrightness: Float  // What brightness level to use when slider is at 0%
-    let maxBrightness: Float  // What brightness level to use when slider is at 100%
+    var minBrightness: Float  // What brightness level to use when slider is at 0%
+    var maxBrightness: Float  // What brightness level to use when slider is at 100%
     
     /// Maps slider value (0-1) to calibrated brightness (min-max)
     func map(_ sliderValue: Float) -> Float {
@@ -16,7 +16,8 @@ struct BrightnessCalibration {
     /// Reverse maps calibrated brightness back to slider value
     func reverseMap(_ brightness: Float) -> Float {
         guard maxBrightness > minBrightness else { return brightness }
-        return (brightness - minBrightness) / (maxBrightness - minBrightness)
+        let value = (brightness - minBrightness) / (maxBrightness - minBrightness)
+        return max(0.0, min(1.0, value))
     }
 }
 
@@ -26,15 +27,36 @@ class BrightnessController {
     private let displayManager = DisplayManager()
     private let ddcControl = DDCControl()
     
-    // Calibration settings
-    // MacBook: slider 0% = 20% brightness, slider 100% = 80% brightness
-    private let macBookCalibration = BrightnessCalibration(minBrightness: 0.20, maxBrightness: 0.80)
+    // UserDefaults keys
+    private let macMinKey = "macMinBrightness"
+    private let macMaxKey = "macMaxBrightness"
+    
+    // Calibration settings (loaded from UserDefaults)
+    var macBookCalibration: BrightnessCalibration {
+        didSet {
+            saveCalirationSettings()
+        }
+    }
     
     // External monitor: slider 0% = 0% brightness, slider 100% = 100% brightness
-    private let monitorCalibration = BrightnessCalibration(minBrightness: 0.0, maxBrightness: 1.0)
+    let monitorCalibration = BrightnessCalibration(minBrightness: 0.0, maxBrightness: 1.0)
     
     // Store the current slider value (0-1)
     private var currentSliderValue: Float = 0.5
+    
+    init() {
+        // Load saved calibration or use defaults
+        let defaults = UserDefaults.standard
+        let savedMin = defaults.object(forKey: macMinKey) as? Float ?? 0.20
+        let savedMax = defaults.object(forKey: macMaxKey) as? Float ?? 0.80
+        self.macBookCalibration = BrightnessCalibration(minBrightness: savedMin, maxBrightness: savedMax)
+    }
+    
+    private func saveCalirationSettings() {
+        let defaults = UserDefaults.standard
+        defaults.set(macBookCalibration.minBrightness, forKey: macMinKey)
+        defaults.set(macBookCalibration.maxBrightness, forKey: macMaxKey)
+    }
     
     /// Sets brightness for all displays using calibrated values
     /// - Parameter level: Slider level from 0.0 to 1.0
@@ -46,17 +68,17 @@ class BrightnessController {
         let macBrightness = macBookCalibration.map(clampedLevel)
         print("BrightnessSync: Slider \(Int(clampedLevel * 100))% → MacBook \(Int(macBrightness * 100))%")
         
-        // Calculate calibrated brightness for external monitor
-        let monitorBrightness = monitorCalibration.map(clampedLevel)
-        print("BrightnessSync: Slider \(Int(clampedLevel * 100))% → Monitor \(Int(monitorBrightness * 100))%")
-        
         // Set built-in display brightness
         let builtInSuccess = setBuiltInDisplayBrightness(macBrightness)
         if !builtInSuccess {
             print("BrightnessSync: Failed to set MacBook brightness")
         }
         
-        // Set external display brightness via DDC
+        // Calculate calibrated brightness for external monitor
+        let monitorBrightness = monitorCalibration.map(clampedLevel)
+        print("BrightnessSync: Slider \(Int(clampedLevel * 100))% → Monitor \(Int(monitorBrightness * 100))%")
+        
+        // Set external display brightness via DDC (synchronously for key presses)
         let externalDisplays = displayManager.getExternalDisplays()
         for display in externalDisplays {
             ddcControl.setBrightness(for: display, level: monitorBrightness)
@@ -70,7 +92,7 @@ class BrightnessController {
         if let actualBrightness = getBuiltInDisplayBrightness() {
             // Reverse map from actual brightness to slider value
             let sliderValue = macBookCalibration.reverseMap(actualBrightness)
-            currentSliderValue = max(0.0, min(1.0, sliderValue))
+            currentSliderValue = sliderValue
             return currentSliderValue
         }
         
