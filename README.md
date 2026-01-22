@@ -1,74 +1,139 @@
 # BrightnessSync Mac ☀️
 
-A lightweight macOS menu bar app to control your MacBook and external monitor brightness together with calibrated sync.
+A lightweight macOS menu bar app that syncs brightness between your MacBook and external monitors. When you press F1/F2 or adjust brightness via Control Center, your external monitor automatically follows!
 
 ![macOS](https://img.shields.io/badge/macOS-12.0+-blue)
-![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-M1%2FM2%2FM3-green)
+![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-M1%2FM2%2FM3%2FM4-green)
 ![License](https://img.shields.io/badge/license-MIT-brightgreen)
 
-## Features
+## ✨ Features
 
-- ☀️ **Unified brightness control** - Single slider syncs brightness across all displays
-- ⌨️ **Keyboard shortcuts** - Option+F1/F2 to quickly adjust brightness
-- 🔐 **Auto-Permissions** - Prompts for Accessibility access automatically
-- 🎚️ **Calibrated sync** - Maps brightness levels so displays match visually
-- 💡 **Built-in display support** - Native brightness control via DisplayServices
-- 🖥️ **External monitor support** - DDC/CI via m1ddc for hardware brightness
-- ⚡ **Lightweight** - Pure Swift, minimal memory footprint
+- ☀️ **Unified Brightness Control** - Single slider syncs all displays
+- 🎹 **Native F1/F2 Keys** - Works automatically with your keyboard
+- 🔌 **Auto-Detect** - Monitors plug/unplug detection
+- ⚙️ **Calibration Settings** - Customize min/max brightness limits
+- 🖥️ **Multi-Display** - Controls all connected external monitors
+- ⚡ **Lightweight** - Pure Swift, ~100KB, no background CPU usage
 
-## Installation
+## 📥 Installation
 
-### 1. Download DMG
-Download the latest release from the [Releases](../../releases) page.
+### 1. Install m1ddc (Required)
+```bash
+brew install m1ddc
+```
 
-### 2. Install
-Open `BrightnessSyncMac.dmg` and drag the app to your Applications folder.
+### 2. Download the App
+Download `BrightnessSyncMac.dmg` from the [Releases](../../releases) page.
 
-### 3. Bypass "App is Damaged" Warning
-Since this app is not signed with a paid Apple Developer ID, macOS (Gatekeeper) may show an error that **"BrightnessSync Mac is damaged and can't be opened."**
+### 3. Install & Fix Gatekeeper
+```bash
+# Drag app to Applications, then run:
+xattr -cr "/Applications/BrightnessSync Mac.app"
+```
 
-To fix this, open Terminal and run this command:
+### 4. Launch
+Open BrightnessSync Mac from Applications. A ☀️ icon appears in your menu bar.
+
+## 🎮 Usage
+
+- **F1/F2 Keys**: Just use them normally - external monitor follows automatically
+- **Menu Bar Slider**: Click the ☀️ icon and drag the slider
+- **Control Center**: Brightness changes sync to external monitors
+
+## ⚙️ Calibration Settings
+
+Click ☀️ → "Calibration Settings..." to customize:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Minimum | 20% | MacBook brightness when slider is at 0% |
+| Maximum | 80% | MacBook brightness when slider is at 100% |
+
+This prevents your MacBook from going too dim or too bright relative to your external monitor.
+
+## ⚠️ Important: Connection Type Matters
+
+### ✅ Supported Connections
+| Connection | DDC Support | Notes |
+|------------|-------------|-------|
+| **USB-C / Thunderbolt** | ✅ Works | Best option |
+| **DisplayPort** | ✅ Works | Use USB-C to DP adapter |
+
+### ❌ Not Supported
+| Connection | DDC Support | Notes |
+|------------|-------------|-------|
+| **HDMI** | ❌ Doesn't work | Apple Silicon limitation |
+| **HDMI Adapters** | ❌ Rarely works | Most adapters block DDC |
+
+### Why HDMI Doesn't Work
+
+On Apple Silicon Macs, **HDMI connections do not reliably support DDC/CI** (the protocol used to control monitor brightness). This is a hardware/driver limitation in macOS, not something any software can fix.
+
+**If you're using HDMI:**
+- Switch to **USB-C** or **DisplayPort** connection
+- Use a **USB-C to DisplayPort adapter** instead of HDMI
+- Some monitors have USB-C input that supports DDC
+
+**To verify your monitor supports DDC, run:**
+```bash
+m1ddc set luminance 50
+```
+If you see `DDC communication failure`, your connection doesn't support brightness control.
+
+## 🔧 Troubleshooting
+
+### "App is damaged" error
 ```bash
 xattr -cr "/Applications/BrightnessSync Mac.app"
 ```
-Then you can run the app normally!
 
-## Requirements
+### External monitor not responding
+1. Check connection type (USB-C works, HDMI doesn't)
+2. Verify m1ddc is installed: `which m1ddc`
+3. Test m1ddc directly: `m1ddc set luminance 50`
 
-- macOS 12.0 (Monterey) or later
-- Apple Silicon Mac (M1/M2/M3)
-- `m1ddc` for external monitor control:
-  ```bash
-  brew install m1ddc
-  ```
+### Monitor not detected
+```bash
+m1ddc display list
+```
+Your monitor should appear in the list.
 
-## Usage
+## 🏗️ Building from Source
 
-1. **Run the app** - A ☀️ icon appears in your menu bar
-2. **Grant Permissions** - The app will ask for Accessibility access (needed for keyboard shortcuts)
-3. **Use the Slider** - Click the icon to adjust brightness
-4. **Use Shortcuts** - ⌥F1 (decrease) / ⌥F2 (increase)
+```bash
+git clone https://github.com/aditya-madaan/BrightnessSync-Mac.git
+cd BrightnessSync-Mac
+./build.sh
+```
 
-## How It Works
+The built app will be in `build/BrightnessSync Mac.app`
 
-- **MacBook display**: Uses Apple's DisplayServices private framework
-- **External monitors**: Uses [m1ddc](https://github.com/waydabber/m1ddc) for DDC/CI control
-- **Permissions**: Polling mechanism detects when Accessibility is granted to enable shortcuts
-
-## Project Structure
+## 📁 Project Structure
 
 ```
-BrightnessSyncMac/
+BrightnessSync-Mac/
 ├── BrightnessSyncMac/
 │   ├── main.swift              # App entry point
-│   ├── AppDelegate.swift       # Menu bar UI + logic
-│   ├── BrightnessController.swift  # Brightness management
-│   ├── DDCControl.swift        # External monitor via m1ddc
-│   └── DisplayManager.swift    # Display enumeration
+│   ├── AppDelegate.swift       # Menu bar UI + settings
+│   ├── BrightnessController.swift  # Brightness logic + sync
+│   ├── DDCControl.swift        # m1ddc wrapper
+│   ├── DisplayManager.swift    # Display detection
+│   └── Info.plist              # App configuration
 ├── build.sh                    # Build script
 └── README.md
 ```
 
-## License
+## 📋 Requirements
+
+- **macOS 12.0+** (Monterey, Ventura, Sonoma, Sequoia)
+- **Apple Silicon** (M1, M2, M3, M4)
+- **m1ddc** (`brew install m1ddc`)
+- **USB-C or DisplayPort** connection (not HDMI)
+
+## 📄 License
 
 MIT License - see [LICENSE](LICENSE)
+
+## 🙏 Credits
+
+- [m1ddc](https://github.com/waydabber/m1ddc) - DDC control for Apple Silicon
