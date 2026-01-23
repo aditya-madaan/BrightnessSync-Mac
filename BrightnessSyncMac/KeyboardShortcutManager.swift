@@ -10,13 +10,16 @@ class KeyboardShortcutManager {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     
-    // Shortcut configuration
-    private let brightnessStep: Float = 0.0625 // 6.25% per step
+    // Brightness step
+    private let brightnessStep: Float = 0.0625
     
-    // Default shortcuts: Ctrl+Shift+Up/Down
-    private let modifierFlags: CGEventFlags = [.maskControl, .maskShift]
-    private let upKeyCode: CGKeyCode = 126    // Up arrow
-    private let downKeyCode: CGKeyCode = 125  // Down arrow
+    // Key codes - using [ and ] which exist on all keyboards
+    private let brightnessUpKeyCode: UInt16 = 30    // ] key
+    private let brightnessDownKeyCode: UInt16 = 33  // [ key
+    
+    // Also support arrow keys as alternative
+    private let upArrowKeyCode: UInt16 = 126
+    private let downArrowKeyCode: UInt16 = 125
     
     func start() {
         let eventMask = (1 << CGEventType.keyDown.rawValue)
@@ -33,7 +36,7 @@ class KeyboardShortcutManager {
             },
             userInfo: Unmanaged.passUnretained(self).toOpaque()
         ) else {
-            print("BrightnessSync: Failed to create keyboard shortcut tap")
+            print("BrightnessSync: ❌ Failed to create event tap - check Accessibility permissions")
             return
         }
         
@@ -43,7 +46,9 @@ class KeyboardShortcutManager {
         CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
         
-        print("BrightnessSync: Keyboard shortcuts active (Ctrl+Shift+↑/↓)")
+        print("BrightnessSync: ✓ Keyboard shortcuts active")
+        print("BrightnessSync:   Option+Shift+] = Brightness Up")
+        print("BrightnessSync:   Option+Shift+[ = Brightness Down")
     }
     
     func stop() {
@@ -59,8 +64,8 @@ class KeyboardShortcutManager {
     }
     
     private func handleEvent(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
-        // Re-enable if disabled
-        if type == .tapDisabledByTimeout {
+        // Re-enable tap if it was disabled
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             if let tap = eventTap {
                 CGEvent.tapEnable(tap: tap, enable: true)
             }
@@ -71,29 +76,38 @@ class KeyboardShortcutManager {
             return Unmanaged.passUnretained(event)
         }
         
-        let keyCode = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
+        let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
         let flags = event.flags
         
-        // Check for Ctrl+Shift modifier
-        let hasCtrl = flags.contains(.maskControl)
+        // Check for Option+Shift modifier (no Cmd, no Ctrl)
+        let hasOption = flags.contains(.maskAlternate)
         let hasShift = flags.contains(.maskShift)
         let hasCmd = flags.contains(.maskCommand)
-        let hasOpt = flags.contains(.maskAlternate)
+        let hasCtrl = flags.contains(.maskControl)
         
-        // Must have Ctrl+Shift, no Cmd or Option
-        guard hasCtrl && hasShift && !hasCmd && !hasOpt else {
+        // Require Option+Shift only
+        guard hasOption && hasShift && !hasCmd && !hasCtrl else {
             return Unmanaged.passUnretained(event)
         }
         
-        // Check for up/down arrow
-        if keyCode == upKeyCode || keyCode == downKeyCode {
-            let isUp = keyCode == upKeyCode
+        // Check for our brightness keys: [ and ] or arrow keys
+        var isBrightnessUp = false
+        var isBrightnessDown = false
+        
+        if keyCode == brightnessUpKeyCode || keyCode == upArrowKeyCode {
+            isBrightnessUp = true
+        } else if keyCode == brightnessDownKeyCode || keyCode == downArrowKeyCode {
+            isBrightnessDown = true
+        }
+        
+        if isBrightnessUp || isBrightnessDown {
+            print("BrightnessSync: Shortcut detected - \(isBrightnessUp ? "UP" : "DOWN")")
             
             DispatchQueue.main.async { [weak self] in
-                self?.adjustBrightness(up: isUp)
+                self?.adjustBrightness(up: isBrightnessUp)
             }
             
-            // Consume the event
+            // Consume the event so it doesn't do anything else
             return nil
         }
         
@@ -101,12 +115,15 @@ class KeyboardShortcutManager {
     }
     
     private func adjustBrightness(up: Bool) {
-        guard let controller = brightnessController else { return }
+        guard let controller = brightnessController else {
+            print("BrightnessSync: No controller")
+            return
+        }
         
         let current = controller.getBrightness()
         let newLevel = up ? min(1.0, current + brightnessStep) : max(0.0, current - brightnessStep)
         
-        print("BrightnessSync: Shortcut \(up ? "↑" : "↓") → \(Int(newLevel * 100))%")
+        print("BrightnessSync: \(up ? "↑" : "↓") → \(Int(newLevel * 100))%")
         controller.setBrightness(newLevel)
         
         DispatchQueue.main.async { [weak self] in
