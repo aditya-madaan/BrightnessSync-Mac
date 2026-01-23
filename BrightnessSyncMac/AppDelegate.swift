@@ -8,12 +8,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrightnessChangeDelegate {
     private var brightnessController: BrightnessController!
     private var sliderView: BrightnessSliderView!
     private var settingsWindow: NSWindow?
+    private var shortcutManager: KeyboardShortcutManager!
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         print("BrightnessSync: App launching...")
         
         brightnessController = BrightnessController()
         brightnessController.delegate = self
+        
+        // Setup keyboard shortcuts
+        shortcutManager = KeyboardShortcutManager()
+        shortcutManager.brightnessController = brightnessController
+        shortcutManager.delegate = self
         
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
@@ -32,11 +38,70 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrightnessChangeDelegate {
         // Start monitoring Mac brightness for reactive sync
         brightnessController.startMonitoring()
         
-        print("BrightnessSync: Ready! Using native F1/F2 keys will sync to monitor.")
+        // Check permissions and start keyboard shortcuts
+        checkAccessibilityPermissions()
+        
+        print("BrightnessSync: Ready!")
     }
     
     func applicationWillTerminate(_ notification: Notification) {
         brightnessController.stopMonitoring()
+        shortcutManager.stop()
+    }
+    
+    // MARK: - Accessibility Permissions
+    
+    private func checkAccessibilityPermissions() {
+        if AXIsProcessTrusted() {
+            print("BrightnessSync: Accessibility ✓")
+            shortcutManager.start()
+        } else {
+            promptForAccessibility()
+        }
+    }
+    
+    private func promptForAccessibility() {
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        let accessEnabled = AXIsProcessTrustedWithOptions(options)
+        
+        if accessEnabled {
+            shortcutManager.start()
+        } else {
+            showAccessibilityAlert()
+            startAccessibilityPolling()
+        }
+    }
+    
+    private func showAccessibilityAlert() {
+        let alert = NSAlert()
+        alert.messageText = "Accessibility Access Required"
+        alert.informativeText = "BrightnessSync needs Accessibility access for keyboard shortcuts (Ctrl+Shift+↑/↓).\n\nPlease enable in System Settings → Privacy & Security → Accessibility."
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Open Settings")
+        alert.addButton(withTitle: "Later")
+        
+        if alert.runModal() == .alertFirstButtonReturn {
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                NSWorkspace.shared.open(url)
+            }
+        }
+    }
+    
+    private func startAccessibilityPolling() {
+        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] timer in
+            if AXIsProcessTrusted() {
+                timer.invalidate()
+                self?.shortcutManager.start()
+                self?.updateShortcutStatus()
+            }
+        }
+    }
+    
+    private func updateShortcutStatus() {
+        if let menu = statusItem.menu,
+           let item = menu.items.first(where: { $0.title.contains("Ctrl") }) {
+            item.title = "⌃⇧↑/↓ Shortcuts active ✓"
+        }
     }
     
     // MARK: - BrightnessChangeDelegate
@@ -65,7 +130,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrightnessChangeDelegate {
             let displayCount = brightnessController.getDisplayCount()
             infoItem.title = "\(displayCount) display(s) connected"
         }
-        // Sync current brightness to new display
         let current = brightnessController.getBrightness()
         brightnessController.setBrightness(current)
     }
@@ -89,10 +153,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrightnessChangeDelegate {
         menu.addItem(sliderItem)
         menu.addItem(NSMenuItem.separator())
         
-        // Status
-        let statusInfo = NSMenuItem(title: "Auto-syncs with F1/F2 keys ✓", action: nil, keyEquivalent: "")
-        statusInfo.isEnabled = false
-        menu.addItem(statusInfo)
+        // Status info
+        let syncInfo = NSMenuItem(title: "Auto-syncs with F1/F2 ✓", action: nil, keyEquivalent: "")
+        syncInfo.isEnabled = false
+        menu.addItem(syncInfo)
+        
+        let shortcutStatus = AXIsProcessTrusted() ? "⌃⇧↑/↓ Shortcuts active ✓" : "⌃⇧↑/↓ Shortcuts (needs permissions)"
+        let shortcutInfo = NSMenuItem(title: shortcutStatus, action: nil, keyEquivalent: "")
+        shortcutInfo.isEnabled = false
+        menu.addItem(shortcutInfo)
         
         let displayCount = brightnessController.getDisplayCount()
         let infoItem = NSMenuItem(title: "\(displayCount) display(s) connected", action: nil, keyEquivalent: "")
@@ -127,7 +196,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrightnessChangeDelegate {
     
     private func createSettingsWindow() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 350, height: 200),
+            contentRect: NSRect(x: 0, y: 0, width: 350, height: 220),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -141,52 +210,59 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrightnessChangeDelegate {
         // Title
         let titleLabel = NSTextField(labelWithString: "MacBook Brightness Limits")
         titleLabel.font = .boldSystemFont(ofSize: 14)
-        titleLabel.frame = NSRect(x: 20, y: 150, width: 300, height: 20)
+        titleLabel.frame = NSRect(x: 20, y: 170, width: 300, height: 20)
         contentView.addSubview(titleLabel)
         
-        let descLabel = NSTextField(wrappingLabelWithString: "Maps slider 0-100% to these MacBook brightness values.\nThe external monitor always uses 0-100%.")
-        descLabel.frame = NSRect(x: 20, y: 110, width: 310, height: 40)
+        let descLabel = NSTextField(wrappingLabelWithString: "Maps slider 0-100% to these MacBook brightness values.\nExternal monitor always uses 0-100%.")
+        descLabel.frame = NSRect(x: 20, y: 130, width: 310, height: 40)
         descLabel.font = .systemFont(ofSize: 11)
         descLabel.textColor = .secondaryLabelColor
         contentView.addSubview(descLabel)
         
         // Min slider
         let minLabel = NSTextField(labelWithString: "Minimum (0%):")
-        minLabel.frame = NSRect(x: 20, y: 75, width: 100, height: 20)
+        minLabel.frame = NSRect(x: 20, y: 95, width: 100, height: 20)
         contentView.addSubview(minLabel)
         
         let minSlider = NSSlider(value: Double(brightnessController.macBookCalibration.minBrightness * 100),
                                   minValue: 0, maxValue: 50,
                                   target: self, action: #selector(minSliderChanged(_:)))
-        minSlider.frame = NSRect(x: 120, y: 75, width: 150, height: 20)
+        minSlider.frame = NSRect(x: 120, y: 95, width: 150, height: 20)
         minSlider.tag = 1
         contentView.addSubview(minSlider)
         
         let minValueLabel = NSTextField(labelWithString: "\(Int(brightnessController.macBookCalibration.minBrightness * 100))%")
-        minValueLabel.frame = NSRect(x: 280, y: 75, width: 50, height: 20)
+        minValueLabel.frame = NSRect(x: 280, y: 95, width: 50, height: 20)
         minValueLabel.tag = 101
         contentView.addSubview(minValueLabel)
         
         // Max slider
         let maxLabel = NSTextField(labelWithString: "Maximum (100%):")
-        maxLabel.frame = NSRect(x: 20, y: 45, width: 100, height: 20)
+        maxLabel.frame = NSRect(x: 20, y: 65, width: 100, height: 20)
         contentView.addSubview(maxLabel)
         
         let maxSlider = NSSlider(value: Double(brightnessController.macBookCalibration.maxBrightness * 100),
                                   minValue: 50, maxValue: 100,
                                   target: self, action: #selector(maxSliderChanged(_:)))
-        maxSlider.frame = NSRect(x: 120, y: 45, width: 150, height: 20)
+        maxSlider.frame = NSRect(x: 120, y: 65, width: 150, height: 20)
         maxSlider.tag = 2
         contentView.addSubview(maxSlider)
         
         let maxValueLabel = NSTextField(labelWithString: "\(Int(brightnessController.macBookCalibration.maxBrightness * 100))%")
-        maxValueLabel.frame = NSRect(x: 280, y: 45, width: 50, height: 20)
+        maxValueLabel.frame = NSRect(x: 280, y: 65, width: 50, height: 20)
         maxValueLabel.tag = 102
         contentView.addSubview(maxValueLabel)
         
+        // Shortcut info
+        let shortcutLabel = NSTextField(labelWithString: "Keyboard: Ctrl+Shift+↑/↓")
+        shortcutLabel.frame = NSRect(x: 20, y: 35, width: 200, height: 20)
+        shortcutLabel.font = .systemFont(ofSize: 11)
+        shortcutLabel.textColor = .secondaryLabelColor
+        contentView.addSubview(shortcutLabel)
+        
         // Reset button
         let resetButton = NSButton(title: "Reset to Defaults", target: self, action: #selector(resetCalibration))
-        resetButton.frame = NSRect(x: 20, y: 10, width: 120, height: 25)
+        resetButton.frame = NSRect(x: 20, y: 5, width: 120, height: 25)
         contentView.addSubview(resetButton)
         
         window.contentView = contentView

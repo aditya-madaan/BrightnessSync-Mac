@@ -10,10 +10,21 @@ A lightweight macOS menu bar app that syncs brightness between your MacBook and 
 
 - ☀️ **Unified Brightness Control** - Single slider syncs all displays
 - 🎹 **Native F1/F2 Keys** - Works automatically with your keyboard
+- ⌨️ **Custom Shortcuts** - Ctrl+Shift+↑/↓ for mechanical keyboards
 - 🔌 **Auto-Detect** - Monitors plug/unplug detection
 - ⚙️ **Calibration Settings** - Customize min/max brightness limits
 - 🖥️ **Multi-Display** - Controls all connected external monitors
 - ⚡ **Lightweight** - Pure Swift, ~100KB, no background CPU usage
+
+## ⌨️ Keyboard Shortcuts
+
+| Shortcut | Action | Notes |
+|----------|--------|-------|
+| **F1 / F2** | Brightness Down / Up | Native MacBook keys, auto-sync |
+| **Ctrl+Shift+↑** | Brightness Up | Works from any keyboard |
+| **Ctrl+Shift+↓** | Brightness Down | Works from any keyboard |
+
+> **Note**: Custom shortcuts require Accessibility permissions. The app will prompt you on first launch.
 
 ## 📥 Installation
 
