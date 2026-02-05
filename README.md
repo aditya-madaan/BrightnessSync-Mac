@@ -21,8 +21,8 @@ A lightweight macOS menu bar app that syncs brightness between your MacBook and 
 | Shortcut | Action | Notes |
 |----------|--------|-------|
 | **F1 / F2** | Brightness Down / Up | Native MacBook keys, auto-sync |
-| **Option+Shift+]** | Brightness Up | Works from any keyboard |
-| **Option+Shift+[** | Brightness Down | Works from any keyboard |
+| **Option+]** | Brightness Up | Works from any keyboard |
+| **Option+[** | Brightness Down | Works from any keyboard |
 
 > **Note**: Custom shortcuts require Accessibility permissions. The app will prompt you on first launch.
 

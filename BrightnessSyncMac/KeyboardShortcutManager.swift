@@ -47,8 +47,8 @@ class KeyboardShortcutManager {
         CGEvent.tapEnable(tap: tap, enable: true)
         
         print("BrightnessSync: ✓ Keyboard shortcuts active")
-        print("BrightnessSync:   Option+Shift+] = Brightness Up")
-        print("BrightnessSync:   Option+Shift+[ = Brightness Down")
+        print("BrightnessSync:   Option+] = Brightness Up")
+        print("BrightnessSync:   Option+[ = Brightness Down")
     }
     
     func stop() {
@@ -79,14 +79,14 @@ class KeyboardShortcutManager {
         let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
         let flags = event.flags
         
-        // Check for Option+Shift modifier (no Cmd, no Ctrl)
+        // Check for Option modifier only (no Cmd, no Ctrl, no Shift)
         let hasOption = flags.contains(.maskAlternate)
         let hasShift = flags.contains(.maskShift)
         let hasCmd = flags.contains(.maskCommand)
         let hasCtrl = flags.contains(.maskControl)
         
-        // Require Option+Shift only
-        guard hasOption && hasShift && !hasCmd && !hasCtrl else {
+        // Require Option only
+        guard hasOption && !hasShift && !hasCmd && !hasCtrl else {
             return Unmanaged.passUnretained(event)
         }
         

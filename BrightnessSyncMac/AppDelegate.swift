@@ -75,7 +75,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrightnessChangeDelegate {
     private func showAccessibilityAlert() {
         let alert = NSAlert()
         alert.messageText = "Accessibility Access Required"
-        alert.informativeText = "BrightnessSync needs Accessibility access for keyboard shortcuts (Option+Shift+[ / ]).\n\nPlease enable in System Settings → Privacy & Security → Accessibility."
+        alert.informativeText = "BrightnessSync needs Accessibility access for keyboard shortcuts (Option+[ / ]).\n\nPlease enable in System Settings → Privacy & Security → Accessibility."
         alert.alertStyle = .informational
         alert.addButton(withTitle: "Open Settings")
         alert.addButton(withTitle: "Later")
@@ -100,7 +100,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrightnessChangeDelegate {
     private func updateShortcutStatus() {
         if let menu = statusItem.menu,
            let item = menu.items.first(where: { $0.title.contains("⌥") || $0.title.contains("Shortcuts") }) {
-            item.title = "⌥⇧[ / ] Shortcuts active ✓"
+            item.title = "⌥[ / ] Shortcuts active ✓"
         }
     }
     
@@ -158,7 +158,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrightnessChangeDelegate {
         syncInfo.isEnabled = false
         menu.addItem(syncInfo)
         
-        let shortcutStatus = AXIsProcessTrusted() ? "⌥⇧[ / ] Shortcuts active ✓" : "⌥⇧[ / ] (needs permissions)"
+        let shortcutStatus = AXIsProcessTrusted() ? "⌥[ / ] Shortcuts active ✓" : "⌥[ / ] (needs permissions)"
         let shortcutInfo = NSMenuItem(title: shortcutStatus, action: nil, keyEquivalent: "")
         shortcutInfo.isEnabled = false
         menu.addItem(shortcutInfo)
@@ -254,7 +254,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrightnessChangeDelegate {
         contentView.addSubview(maxValueLabel)
         
         // Shortcut info
-        let shortcutLabel = NSTextField(labelWithString: "Keyboard: Option+Shift+[ / ]")
+        let shortcutLabel = NSTextField(labelWithString: "Keyboard: Option+[ / ]")
         shortcutLabel.frame = NSRect(x: 20, y: 35, width: 200, height: 20)
         shortcutLabel.font = .systemFont(ofSize: 11)
         shortcutLabel.textColor = .secondaryLabelColor
