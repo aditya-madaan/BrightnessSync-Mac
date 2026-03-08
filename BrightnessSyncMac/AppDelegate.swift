@@ -4,21 +4,36 @@ import ApplicationServices
 
 // MARK: - Design Tokens
 private enum DS {
-    // Colors
-    static let amber     = NSColor(red: 0.957, green: 0.753, blue: 0.145, alpha: 1) // #f4c025
-    static let amberDim  = NSColor(red: 0.957, green: 0.753, blue: 0.145, alpha: 0.15)
-    static let surface   = NSColor(red: 0.11, green: 0.11, blue: 0.12, alpha: 1)    // #1c1c1f
-    static let surface2  = NSColor(red: 0.16, green: 0.16, blue: 0.18, alpha: 1)    // #292930
-    static let border    = NSColor(white: 1.0, alpha: 0.08)
-    static let text      = NSColor(white: 1.0, alpha: 0.92)
-    static let textMuted = NSColor(white: 1.0, alpha: 0.45)
-    static let green     = NSColor(red: 0.20, green: 0.87, blue: 0.50, alpha: 1)
-    static let separator = NSColor(white: 1.0, alpha: 0.10)
+    // Amber accent: #f4c025
+    static let amber      = NSColor(red: 0.957, green: 0.753, blue: 0.145, alpha: 1)
+    static let amberDim   = NSColor(red: 0.957, green: 0.753, blue: 0.145, alpha: 0.18)
+    static let amberGlow  = NSColor(red: 0.957, green: 0.753, blue: 0.145, alpha: 0.55)
+    static let amberDark  = NSColor(red: 0.78, green: 0.45, blue: 0.02, alpha: 1)   // #c77308
 
-    // Sizing
-    static let popoverWidth: CGFloat  = 280
-    static let popoverHeight: CGFloat = 230
-    static let cornerRadius: CGFloat  = 12
+    // Surfaces
+    static let bg         = NSColor(red: 0.098, green: 0.098, blue: 0.110, alpha: 1) // #191919
+    static let card       = NSColor(red: 0.145, green: 0.145, blue: 0.165, alpha: 1) // #252529
+    static let divider    = NSColor(white: 1.0, alpha: 0.09)
+    static let border     = NSColor(white: 1.0, alpha: 0.10)
+
+    // Text
+    static let textPrimary  = NSColor(white: 1.0, alpha: 0.90)
+    static let textSecondary = NSColor(white: 1.0, alpha: 0.48)
+    static let greenDot      = NSColor(red: 0.22, green: 0.86, blue: 0.50, alpha: 1)
+
+    // Layout
+    static let popW: CGFloat    = 280
+    static let popH: CGFloat    = 240
+    static let sidePad: CGFloat = 16
+    static let radius: CGFloat  = 12
+
+    // Typography helpers
+    static func body(_ size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
+        .systemFont(ofSize: size, weight: weight)
+    }
+    static func mono(_ size: CGFloat, weight: NSFont.Weight = .medium) -> NSFont {
+        .monospacedDigitSystemFont(ofSize: size, weight: weight)
+    }
 }
 
 // MARK: - AppDelegate
@@ -32,8 +47,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrightnessChangeDelegate {
     private var shortcutManager: KeyboardShortcutManager!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        print("BrightnessSync: App launching...")
-
         brightnessController = BrightnessController()
         brightnessController.delegate = self
 
@@ -42,10 +55,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrightnessChangeDelegate {
         shortcutManager.delegate = self
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-
         if let button = statusItem.button {
-            if let image = NSImage(systemSymbolName: "sun.max.fill", accessibilityDescription: "Brightness") {
-                button.image = image
+            if let img = NSImage(systemSymbolName: "sun.max.fill", accessibilityDescription: "Brightness") {
+                button.image = img
                 button.image?.isTemplate = true
             } else {
                 button.title = "☀️"
@@ -56,8 +68,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrightnessChangeDelegate {
         monitorDisplayChanges()
         brightnessController.startMonitoring()
         checkAccessibilityPermissions()
-
-        print("BrightnessSync: Ready!")
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -69,7 +79,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrightnessChangeDelegate {
 
     private func checkAccessibilityPermissions() {
         if AXIsProcessTrusted() {
-            print("BrightnessSync: Accessibility ✓")
             shortcutManager.start()
         } else {
             promptForAccessibility()
@@ -77,9 +86,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrightnessChangeDelegate {
     }
 
     private func promptForAccessibility() {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-        let accessEnabled = AXIsProcessTrustedWithOptions(options)
-        if accessEnabled {
+        let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        if AXIsProcessTrustedWithOptions(opts) {
             shortcutManager.start()
         } else {
             showAccessibilityAlert()
@@ -88,72 +96,59 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrightnessChangeDelegate {
     }
 
     private func showAccessibilityAlert() {
-        let alert = NSAlert()
-        alert.messageText = "Accessibility Access Required"
-        alert.informativeText = "BrightnessSync needs Accessibility access for keyboard shortcuts (Option+[ / ]).\n\nPlease enable in System Settings → Privacy & Security → Accessibility."
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: "Open Settings")
-        alert.addButton(withTitle: "Later")
-        if alert.runModal() == .alertFirstButtonReturn {
-            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-                NSWorkspace.shared.open(url)
-            }
+        let a = NSAlert()
+        a.messageText     = "Accessibility Access Required"
+        a.informativeText = "BrightnessSync needs Accessibility access for keyboard shortcuts (Option+[ / ]).\n\nEnable in System Settings → Privacy & Security → Accessibility."
+        a.alertStyle      = .informational
+        a.addButton(withTitle: "Open Settings")
+        a.addButton(withTitle: "Later")
+        if a.runModal() == .alertFirstButtonReturn {
+            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
         }
     }
 
     private func startAccessibilityPolling() {
-        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] timer in
-            if AXIsProcessTrusted() {
-                timer.invalidate()
-                self?.shortcutManager.start()
-                self?.popoverView?.updateShortcutStatus(active: true)
+        Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] t in
+            if AXIsProcessTrusted() { t.invalidate(); self?.shortcutManager.start()
+                DispatchQueue.main.async { self?.popoverView?.refreshStatus() }
             }
         }
     }
 
     // MARK: - BrightnessChangeDelegate
-
-    func brightnessDidChange(sliderValue: Float) {
-        popoverView?.updateSlider()
-    }
+    func brightnessDidChange(sliderValue: Float) { popoverView?.refreshBrightness() }
 
     private func monitorDisplayChanges() {
-        CGDisplayRegisterReconfigurationCallback({ (displayId, flags, userInfo) in
-            guard let userInfo = userInfo else { return }
-            let delegate = Unmanaged<AppDelegate>.fromOpaque(userInfo).takeUnretainedValue()
+        CGDisplayRegisterReconfigurationCallback({ _, flags, ui in
+            guard let ui else { return }
+            let me = Unmanaged<AppDelegate>.fromOpaque(ui).takeUnretainedValue()
             if flags.contains(.addFlag) || flags.contains(.removeFlag) || flags.contains(.enabledFlag) {
-                DispatchQueue.main.async { delegate.handleDisplayChange() }
+                DispatchQueue.main.async { me.handleDisplayChange() }
             }
         }, Unmanaged.passUnretained(self).toOpaque())
     }
 
     func handleDisplayChange() {
-        print("BrightnessSync: Display changed, syncing...")
-        let displayCount = brightnessController.getDisplayCount()
-        popoverView?.updateDisplayCount(displayCount)
-        let current = brightnessController.getBrightness()
-        brightnessController.setBrightness(current)
+        let c = brightnessController.getBrightness()
+        brightnessController.setBrightness(c)
+        popoverView?.refreshStatus()
     }
 
-    // MARK: - Menu Setup
+    // MARK: - Menu
 
     private func setupMenu() {
         let menu = NSMenu()
-
-        // Modern popover panel item
-        let popoverItem = NSMenuItem()
-        popoverView = ModernPopoverView(frame: NSRect(x: 0, y: 0, width: DS.popoverWidth, height: DS.popoverHeight))
-        popoverView.brightnessController = brightnessController
-        popoverView.onOpenSettings = { [weak self] in self?.openSettings() }
-        popoverView.onQuit = { NSApp.terminate(nil) }
-        popoverView.updateSlider()
-        popoverView.updateShortcutStatus(active: AXIsProcessTrusted())
-        popoverView.updateDisplayCount(brightnessController.getDisplayCount())
-        popoverItem.view = popoverView
-        menu.addItem(popoverItem)
-
-        statusItem.menu = menu
-        menu.delegate = self
+        let item = NSMenuItem()
+        popoverView = ModernPopoverView(
+            frame: NSRect(x: 0, y: 0, width: DS.popW, height: DS.popH),
+            brightnessController: brightnessController,
+            onSettings: { [weak self] in self?.openSettings() },
+            onQuit:     { NSApp.terminate(nil) }
+        )
+        item.view = popoverView
+        menu.addItem(item)
+        statusItem.menu    = menu
+        menu.delegate      = self
     }
 
     @objc private func openSettings() {
@@ -162,284 +157,294 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrightnessChangeDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    // MARK: - Settings Window
-
     private func createSettingsWindow() {
-        let windowWidth: CGFloat  = 380
-        let windowHeight: CGFloat = 270
-
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: windowWidth, height: windowHeight),
+        let w = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 380, height: 270),
             styleMask: [.titled, .closable, .fullSizeContentView],
-            backing: .buffered,
-            defer: false
+            backing: .buffered, defer: false
         )
-        window.title = "Calibration Settings"
-        window.titlebarAppearsTransparent = true
-        window.center()
-        window.isReleasedWhenClosed = false
-        window.backgroundColor = DS.surface
-
-        let contentView = ModernSettingsView(
-            frame: NSRect(x: 0, y: 0, width: windowWidth, height: windowHeight),
-            brightnessController: brightnessController
+        w.title = "Calibration Settings"
+        w.titlebarAppearsTransparent = true
+        w.center()
+        w.isReleasedWhenClosed = false
+        w.backgroundColor = DS.bg
+        w.contentView = ModernSettingsView(
+            frame: NSRect(x: 0, y: 0, width: 380, height: 270),
+            controller: brightnessController
         )
-        window.contentView = contentView
-        settingsWindow = window
+        settingsWindow = w
     }
-
-    @objc private func quitApp() { NSApp.terminate(nil) }
 }
 
 // MARK: - NSMenuDelegate
-
 extension AppDelegate: NSMenuDelegate {
     func menuWillOpen(_ menu: NSMenu) {
-        popoverView?.updateSlider()
-        popoverView?.updateDisplayCount(brightnessController.getDisplayCount())
-        popoverView?.updateShortcutStatus(active: AXIsProcessTrusted())
+        popoverView?.refreshBrightness()
+        popoverView?.refreshStatus()
     }
 }
 
+// ═══════════════════════════════════════════════════════════
 // MARK: - ModernPopoverView
+// ═══════════════════════════════════════════════════════════
 
-class ModernPopoverView: NSView {
+final class ModernPopoverView: NSView {
 
-    var brightnessController: BrightnessController?
-    var onOpenSettings: (() -> Void)?
-    var onQuit: (() -> Void)?
+    private let bc: BrightnessController
+    private let onSettings: () -> Void
+    private let onQuit: () -> Void
 
-    // Sub-views
-    private let gradientSlider   = AmberGradientSlider()
-    private let percentLabel     = NSTextField(labelWithString: "50%")
-    private let syncBadge        = StatusBadge()
-    private let shortcutBadge    = StatusBadge()
-    private let displayBadge     = StatusBadge()
-    private let settingsButton   = HoverMenuItem()
-    private let quitButton       = HoverMenuItem()
+    // Subviews we need to update
+    private let pctLabel   = NSTextField(labelWithString: "–%")
+    private let slider     = AmberSlider()
+    private let syncBadge  = BadgeRow()
+    private let kbBadge    = BadgeRow()
+    private let dispBadge  = BadgeRow()
 
-    override init(frame: NSRect) {
+    init(frame: NSRect,
+         brightnessController: BrightnessController,
+         onSettings: @escaping () -> Void,
+         onQuit: @escaping () -> Void) {
+        self.bc         = brightnessController
+        self.onSettings = onSettings
+        self.onQuit     = onQuit
         super.init(frame: frame)
-        build()
+        wantsLayer            = true
+        layer?.backgroundColor = DS.bg.cgColor
+        buildLayout()
     }
-    required init?(coder: NSCoder) { super.init(coder: coder); build() }
+    required init?(coder: NSCoder) { fatalError() }
 
-    private func build() {
-        wantsLayer = true
-        layer?.backgroundColor = DS.surface.cgColor
-        layer?.cornerRadius    = DS.cornerRadius
+    // ─── Layout constants ─────────────────────────────────
+    private let H: CGFloat = DS.popH   // 240
+    private let W: CGFloat = DS.popW   // 280
+    private let P: CGFloat = DS.sidePad // 16
 
-        // ── Header ──────────────────────────────────────────────
-        let sunIcon = NSImageView()
-        if let img = NSImage(systemSymbolName: "sun.max.fill", accessibilityDescription: nil) {
-            let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
-            sunIcon.image = img.withSymbolConfiguration(config)
-        }
-        sunIcon.contentTintColor = DS.amber
-        sunIcon.frame = NSRect(x: 18, y: 196, width: 20, height: 20)
-        addSubview(sunIcon)
+    private func buildLayout() {
+        // All Y values measured from bottom (NS coordinate origin)
 
-        let titleLabel = NSTextField(labelWithString: "BrightnessSync")
-        titleLabel.font      = .systemFont(ofSize: 13, weight: .semibold)
-        titleLabel.textColor = DS.text
-        titleLabel.frame     = NSRect(x: 43, y: 197, width: 180, height: 18)
-        addSubview(titleLabel)
+        // ── 1. BOTTOM ACTION ROW (Quit) ─── y: 0..22
+        let quitRow = ActionRow(title: "Quit BrightnessSync", key: "⌘Q")
+        quitRow.onTap = { [weak self] in self?.onQuit() }
+        quitRow.frame = NSRect(x: 0, y: 0, width: W, height: 26)
+        addSubview(quitRow)
 
-        // Thin separator
-        let sep1 = NSBox()
-        sep1.boxType    = .separator
-        sep1.frame      = NSRect(x: 0, y: 188, width: DS.popoverWidth, height: 1)
-        sep1.borderColor = DS.separator
-        addSubview(sep1)
+        // ── 2. Settings row ─── y: 26..52
+        let settingsRow = ActionRow(title: "Calibration Settings…", key: "⌘,")
+        settingsRow.onTap = { [weak self] in self?.onSettings() }
+        settingsRow.frame = NSRect(x: 0, y: 26, width: W, height: 26)
+        addSubview(settingsRow)
 
-        // ── Brightness label + percentage ─────────────────────
-        let bLabel = NSTextField(labelWithString: "BRIGHTNESS")
-        bLabel.font      = .systemFont(ofSize: 9, weight: .semibold)
-        bLabel.textColor = DS.textMuted
-        bLabel.frame     = NSRect(x: 18, y: 165, width: 100, height: 14)
+        // ── Divider ─── y: 52
+        addDivider(y: 52)
+
+        // ── 3. STATUS BADGES ─── y: 60..134
+        syncBadge.configure(dotColor: DS.greenDot,  sfSymbol: "arrow.triangle.2.circlepath", text: "Syncing with F1 / F2")
+        kbBadge.configure(dotColor: DS.amber,        sfSymbol: "keyboard",                    text: "⌥[ / ] shortcuts active")
+        dispBadge.configure(dotColor: DS.textSecondary, sfSymbol: "display",                 text: "1 display connected")
+
+        syncBadge.frame  = NSRect(x: 0, y: 112, width: W, height: 26)
+        kbBadge.frame    = NSRect(x: 0, y: 86,  width: W, height: 26)
+        dispBadge.frame  = NSRect(x: 0, y: 60,  width: W, height: 26)
+        addSubview(syncBadge)
+        addSubview(kbBadge)
+        addSubview(dispBadge)
+
+        // ── Divider ─── y: 138
+        addDivider(y: 138)
+
+        // ── 4. SLIDER SECTION ─── y: 148..192
+        // "BRIGHTNESS" label + pctLabel
+        let bLabel = makeLabel("BRIGHTNESS", font: DS.body(9, weight: .semibold), color: DS.textSecondary)
+        bLabel.frame = NSRect(x: P, y: 178, width: 90, height: 12)
+        bLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
         addSubview(bLabel)
 
-        percentLabel.font      = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .semibold)
-        percentLabel.textColor = DS.amber
-        percentLabel.alignment = .right
-        percentLabel.frame     = NSRect(x: DS.popoverWidth - 64, y: 163, width: 46, height: 18)
-        addSubview(percentLabel)
+        pctLabel.font          = DS.mono(13, weight: .bold)
+        pctLabel.textColor     = DS.amber
+        pctLabel.alignment     = .right
+        pctLabel.frame         = NSRect(x: W - P - 50, y: 176, width: 50, height: 16)
+        addSubview(pctLabel)
 
-        // ── Amber gradient slider ─────────────────────────────
-        gradientSlider.frame  = NSRect(x: 18, y: 138, width: DS.popoverWidth - 36, height: 22)
-        gradientSlider.onValueChanged = { [weak self] val in
-            self?.brightnessController?.setBrightness(Float(val / 100.0))
-            self?.percentLabel.stringValue = "\(Int(val))%"
+        // Slider
+        slider.frame = NSRect(x: P, y: 150, width: W - P * 2, height: 22)
+        slider.onChanged = { [weak self] val in
+            guard let self else { return }
+            self.bc.setBrightness(Float(val / 100.0))
+            self.pctLabel.stringValue = "\(Int(val))%"
         }
-        addSubview(gradientSlider)
+        addSubview(slider)
 
-        // ── Status badges ─────────────────────────────────────
-        let sep2 = NSBox()
-        sep2.boxType     = .separator
-        sep2.frame       = NSRect(x: 0, y: 127, width: DS.popoverWidth, height: 1)
-        sep2.borderColor = DS.separator
-        addSubview(sep2)
+        // ── Divider ─── y: 144
+        addDivider(y: 144)
 
-        syncBadge.configure(icon: "arrow.triangle.2.circlepath", text: "Syncing with F1 / F2", dotColor: DS.green)
-        syncBadge.frame = NSRect(x: 14, y: 97, width: DS.popoverWidth - 28, height: 24)
-        addSubview(syncBadge)
+        // ── 5. HEADER ─── y: 200..240
+        // Sun icon (SF Symbol, amber tinted)
+        let sunView = NSImageView(frame: NSRect(x: P, y: 212, width: 18, height: 18))
+        let sunCfg  = NSImage.SymbolConfiguration(pointSize: 15, weight: .semibold)
+        if let img = NSImage(systemSymbolName: "sun.max.fill", accessibilityDescription: nil)?
+                        .withSymbolConfiguration(sunCfg) {
+            sunView.image = img
+        }
+        sunView.contentTintColor = DS.amber
+        sunView.imageScaling     = .scaleProportionallyUpOrDown
+        addSubview(sunView)
 
-        shortcutBadge.configure(icon: "keyboard", text: "⌥[ / ] shortcuts active", dotColor: DS.amber)
-        shortcutBadge.frame = NSRect(x: 14, y: 71, width: DS.popoverWidth - 28, height: 24)
-        addSubview(shortcutBadge)
+        let titleField = makeLabel("BrightnessSync",
+                                   font: DS.body(13, weight: .semibold),
+                                   color: DS.textPrimary)
+        titleField.frame = NSRect(x: P + 26, y: 212, width: 180, height: 18)
+        addSubview(titleField)
 
-        displayBadge.configure(icon: "display", text: "1 display connected", dotColor: DS.textMuted)
-        displayBadge.frame = NSRect(x: 14, y: 45, width: DS.popoverWidth - 28, height: 24)
-        addSubview(displayBadge)
-
-        // ── Bottom separator ──────────────────────────────────
-        let sep3 = NSBox()
-        sep3.boxType     = .separator
-        sep3.frame       = NSRect(x: 0, y: 36, width: DS.popoverWidth, height: 1)
-        sep3.borderColor = DS.separator
-        addSubview(sep3)
-
-        // ── Menu items: Settings + Quit ───────────────────────
-        settingsButton.configure(title: "Calibration Settings...", keyEquiv: "⌘,")
-        settingsButton.frame   = NSRect(x: 0, y: 18, width: DS.popoverWidth, height: 20)
-        settingsButton.onTap   = { [weak self] in self?.onOpenSettings?() }
-        addSubview(settingsButton)
-
-        quitButton.configure(title: "Quit BrightnessSync", keyEquiv: "⌘Q")
-        quitButton.frame = NSRect(x: 0, y: 0, width: DS.popoverWidth, height: 20)
-        quitButton.onTap = { [weak self] in self?.onQuit?() }
-        addSubview(quitButton)
+        // Bottom hairline below header
+        addDivider(y: 206)
     }
 
-    func updateSlider() {
-        let b = brightnessController?.getBrightness() ?? 0.5
-        gradientSlider.setValue(Double(b * 100))
-        percentLabel.stringValue = "\(Int(b * 100))%"
+    @discardableResult
+    private func addDivider(y: CGFloat) -> NSView {
+        let v = NSView(frame: NSRect(x: 0, y: y, width: W, height: 1))
+        v.wantsLayer            = true
+        v.layer?.backgroundColor = DS.divider.cgColor
+        addSubview(v)
+        return v
     }
 
-    func updateShortcutStatus(active: Bool) {
-        shortcutBadge.setDotColor(active ? DS.amber : DS.textMuted)
-        shortcutBadge.setText(active ? "⌥[ / ] shortcuts active" : "⌥[ / ] (needs permissions)")
+    private func makeLabel(_ s: String, font: NSFont, color: NSColor) -> NSTextField {
+        let f = NSTextField(labelWithString: s)
+        f.font      = font
+        f.textColor = color
+        return f
     }
 
-    func updateDisplayCount(_ count: Int) {
-        displayBadge.setText("\(count) display\(count == 1 ? "" : "s") connected")
+    // ─── Public refresh ───────────────────────────────────
+    func refreshBrightness() {
+        let b = bc.getBrightness()
+        slider.setValue(Double(b * 100))
+        pctLabel.stringValue = "\(Int(b * 100))%"
+    }
+
+    func refreshStatus() {
+        let active = AXIsProcessTrusted()
+        kbBadge.setDotColor(active ? DS.amber : DS.textSecondary)
+        kbBadge.setText(active ? "⌥[ / ] shortcuts active" : "⌥[ / ] needs permissions")
+
+        let count = bc.getDisplayCount()
+        dispBadge.setText("\(count) display\(count == 1 ? "" : "s") connected")
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        refreshBrightness()
+        refreshStatus()
     }
 }
 
-// MARK: - AmberGradientSlider
+// ═══════════════════════════════════════════════════════════
+// MARK: - AmberSlider   (custom CALayer-based slider)
+// ═══════════════════════════════════════════════════════════
 
-class AmberGradientSlider: NSView {
+final class AmberSlider: NSView {
 
-    var onValueChanged: ((Double) -> Void)?
+    var onChanged: ((Double) -> Void)?
+    private var value: Double = 50  // 0..100
 
-    private var _value: Double = 50.0
-    private var isDragging = false
-
-    private let trackLayer    = CALayer()
-    private let fillLayer     = CAGradientLayer()
-    private let glowLayer     = CALayer()
-    private let thumbLayer    = CALayer()
+    private let trackBg    = CALayer()
+    private let trackFill  = CAGradientLayer()
+    private let glowLayer  = CALayer()
+    private let thumb      = CALayer()
 
     override var isFlipped: Bool { false }
 
-    override init(frame: NSRect) {
-        super.init(frame: frame)
-        setup()
-    }
+    override init(frame: NSRect) { super.init(frame: frame); setup() }
     required init?(coder: NSCoder) { super.init(coder: coder); setup() }
 
     private func setup() {
         wantsLayer = true
+        layer?.backgroundColor = NSColor.clear.cgColor
 
-        let trackH: CGFloat = 6
-        let y = (bounds.height - trackH) / 2
-
+        let tH: CGFloat = 5
         // Track background
-        trackLayer.backgroundColor = NSColor(white: 1.0, alpha: 0.10).cgColor
-        trackLayer.cornerRadius    = trackH / 2
-        trackLayer.frame           = CGRect(x: 0, y: y, width: bounds.width, height: trackH)
-        layer?.addSublayer(trackLayer)
+        trackBg.cornerRadius  = tH / 2
+        trackBg.backgroundColor = NSColor(white: 1, alpha: 0.12).cgColor
+        layer?.addSublayer(trackBg)
 
         // Amber gradient fill
-        fillLayer.colors     = [
-            NSColor(red: 0.90, green: 0.50, blue: 0.05, alpha: 1).cgColor,
-            DS.amber.cgColor
-        ]
-        fillLayer.startPoint = CGPoint(x: 0, y: 0.5)
-        fillLayer.endPoint   = CGPoint(x: 1, y: 0.5)
-        fillLayer.cornerRadius = trackH / 2
-        layer?.addSublayer(fillLayer)
+        trackFill.cornerRadius = tH / 2
+        trackFill.colors       = [DS.amberDark.cgColor, DS.amber.cgColor]
+        trackFill.startPoint   = CGPoint(x: 0, y: 0.5)
+        trackFill.endPoint     = CGPoint(x: 1, y: 0.5)
+        layer?.addSublayer(trackFill)
 
-        // Glow under thumb
-        glowLayer.backgroundColor = DS.amber.cgColor
-        glowLayer.cornerRadius    = 10
-        glowLayer.shadowColor     = DS.amber.cgColor
-        glowLayer.shadowRadius    = 8
-        glowLayer.shadowOpacity   = 0.7
-        glowLayer.shadowOffset    = .zero
+        // Glow behind thumb
+        glowLayer.cornerRadius  = 9
+        glowLayer.shadowColor   = DS.amber.cgColor
+        glowLayer.shadowRadius  = 7
+        glowLayer.shadowOpacity = 0.75
+        glowLayer.shadowOffset  = .zero
+        glowLayer.backgroundColor = DS.amberGlow.cgColor
         layer?.addSublayer(glowLayer)
 
         // White thumb
-        thumbLayer.backgroundColor = NSColor.white.cgColor
-        thumbLayer.cornerRadius    = 10
-        thumbLayer.shadowColor     = NSColor.black.cgColor
-        thumbLayer.shadowRadius    = 4
-        thumbLayer.shadowOpacity   = 0.3
-        thumbLayer.shadowOffset    = CGSize(width: 0, height: -1)
-        layer?.addSublayer(thumbLayer)
-
-        updateLayers()
+        thumb.cornerRadius     = 10
+        thumb.backgroundColor  = NSColor.white.cgColor
+        thumb.shadowColor      = NSColor.black.cgColor
+        thumb.shadowRadius     = 3
+        thumb.shadowOpacity    = 0.30
+        thumb.shadowOffset     = CGSize(width: 0, height: -1)
+        layer?.addSublayer(thumb)
     }
 
     override func layout() {
         super.layout()
-        setup()
-    }
-
-    private func updateLayers() {
-        let trackH: CGFloat = 6
-        let thumbD: CGFloat = 18
-        let y = (bounds.height - trackH) / 2
-        let thumbY = (bounds.height - thumbD) / 2
-
-        let fraction = CGFloat((_value - 0) / 100.0)
-        let fillWidth = max(trackH, fraction * bounds.width)
-        let thumbX    = fraction * (bounds.width - thumbD)
-
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-
-        trackLayer.frame = CGRect(x: 0, y: y, width: bounds.width, height: trackH)
-        fillLayer.frame  = CGRect(x: 0, y: y, width: fillWidth, height: trackH)
-        glowLayer.frame  = CGRect(x: thumbX + thumbD/2 - 8, y: thumbY + thumbD/2 - 8, width: 16, height: 16)
-        thumbLayer.frame = CGRect(x: thumbX, y: thumbY, width: thumbD, height: thumbD)
-
-        CATransaction.commit()
+        refreshLayers()
     }
 
     func setValue(_ v: Double) {
-        _value = max(0, min(100, v))
-        updateLayers()
+        value = v.clamped(to: 0...100)
+        refreshLayers()
     }
 
-    // Mouse interaction
-    override func mouseDown(with event: NSEvent) { isDragging = true; handle(event) }
-    override func mouseDragged(with event: NSEvent) { handle(event) }
-    override func mouseUp(with event: NSEvent) { isDragging = false; handle(event) }
+    private func refreshLayers() {
+        guard bounds.width > 0 else { return }
 
-    private func handle(_ event: NSEvent) {
-        let loc    = convert(event.locationInWindow, from: nil)
-        let newVal = Double(max(0, min(bounds.width, loc.x))) / Double(bounds.width) * 100.0
-        _value     = newVal
-        updateLayers()
-        onValueChanged?(newVal)
+        let tH: CGFloat  = 5
+        let tY: CGFloat  = (bounds.height - tH) / 2
+        let tD: CGFloat  = 20        // thumb diameter
+        let tY2: CGFloat = (bounds.height - tD) / 2
+
+        let fraction  = CGFloat(value / 100.0)
+        let usable    = bounds.width - tD
+        let thumbX    = fraction * usable
+        let fillW     = max(tH, thumbX + tD / 2)
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        trackBg.frame   = CGRect(x: 0,      y: tY,  width: bounds.width, height: tH)
+        trackFill.frame = CGRect(x: 0,      y: tY,  width: fillW,        height: tH)
+        glowLayer.frame = CGRect(x: thumbX + tD/2 - 9, y: tY2 + tD/2 - 9, width: 18, height: 18)
+        thumb.frame     = CGRect(x: thumbX, y: tY2, width: tD,           height: tD)
+        CATransaction.commit()
+    }
+
+    override func mouseDown(with e: NSEvent)    { drag(e) }
+    override func mouseDragged(with e: NSEvent) { drag(e) }
+    override func mouseUp(with e: NSEvent)      { drag(e) }
+
+    private func drag(_ e: NSEvent) {
+        let x   = convert(e.locationInWindow, from: nil).x
+        let tD: CGFloat = 20
+        let raw = (x - tD / 2) / (bounds.width - tD) * 100
+        value   = raw.clamped(to: 0...100)
+        refreshLayers()
+        onChanged?(value)
     }
 }
 
-// MARK: - StatusBadge
+// ═══════════════════════════════════════════════════════════
+// MARK: - BadgeRow
+// ═══════════════════════════════════════════════════════════
 
-class StatusBadge: NSView {
+final class BadgeRow: NSView {
 
     private let dot   = NSView()
     private let icon  = NSImageView()
@@ -449,234 +454,235 @@ class StatusBadge: NSView {
     required init?(coder: NSCoder) { super.init(coder: coder); build() }
 
     private func build() {
-        // Dot
-        dot.wantsLayer  = true
+        // Dot  — 6×6, centred vertically
+        dot.wantsLayer     = true
+        dot.frame          = NSRect(x: DS.sidePad, y: 10, width: 6, height: 6)
         dot.layer?.cornerRadius = 3
-        dot.frame = NSRect(x: 0, y: 8, width: 6, height: 6)
         addSubview(dot)
 
-        // SF Symbol icon
-        icon.frame = NSRect(x: 14, y: 4, width: 14, height: 14)
-        icon.imageScaling = .scaleProportionallyUpOrDown
+        // SF Symbol icon — 13×13
+        icon.frame         = NSRect(x: DS.sidePad + 14, y: 7, width: 13, height: 13)
+        icon.imageScaling  = .scaleProportionallyUpOrDown
         addSubview(icon)
 
         // Label
-        label.font      = .systemFont(ofSize: 11, weight: .regular)
-        label.textColor = DS.textMuted
-        label.frame     = NSRect(x: 32, y: 5, width: 220, height: 14)
+        label.font         = DS.body(11)
+        label.textColor    = DS.textSecondary
+        label.frame        = NSRect(x: DS.sidePad + 32, y: 6, width: DS.popW - DS.sidePad - 40, height: 14)
         addSubview(label)
     }
 
-    func configure(icon iconName: String, text: String, dotColor: NSColor) {
+    func configure(dotColor: NSColor, sfSymbol: String, text: String) {
         dot.layer?.backgroundColor = dotColor.cgColor
-        label.stringValue = text
-        if let img = NSImage(systemSymbolName: iconName, accessibilityDescription: nil) {
-            let cfg = NSImage.SymbolConfiguration(pointSize: 10, weight: .regular)
-            icon.image = img.withSymbolConfiguration(cfg)
-            icon.contentTintColor = DS.textMuted
+        label.stringValue          = text
+        if let img = NSImage(systemSymbolName: sfSymbol, accessibilityDescription: nil)?
+                        .withSymbolConfiguration(.init(pointSize: 11, weight: .regular)) {
+            icon.image            = img
+            icon.contentTintColor = DS.textSecondary
         }
     }
 
-    func setDotColor(_ color: NSColor) { dot.layer?.backgroundColor = color.cgColor }
-    func setText(_ text: String)       { label.stringValue = text }
+    func setDotColor(_ c: NSColor) { dot.layer?.backgroundColor = c.cgColor }
+    func setText(_ t: String)       { label.stringValue = t }
 }
 
-// MARK: - HoverMenuItem
+// ═══════════════════════════════════════════════════════════
+// MARK: - ActionRow  (Settings / Quit)
+// ═══════════════════════════════════════════════════════════
 
-class HoverMenuItem: NSView {
+final class ActionRow: NSView {
 
     var onTap: (() -> Void)?
+    private let titleLbl = NSTextField(labelWithString: "")
+    private let keyLbl   = NSTextField(labelWithString: "")
+    private var tracking: NSTrackingArea?
 
-    private let titleLabel  = NSTextField(labelWithString: "")
-    private let keyLabel    = NSTextField(labelWithString: "")
-    private var isHovered   = false
-
-    override init(frame: NSRect) { super.init(frame: frame); build() }
-    required init?(coder: NSCoder) { super.init(coder: coder); build() }
-
-    private func build() {
+    init(title: String, key: String) {
+        super.init(frame: .zero)
         wantsLayer = true
-        layer?.cornerRadius = 6
+        layer?.cornerRadius = 0
+        titleLbl.font      = DS.body(12)
+        titleLbl.textColor = DS.textPrimary
+        titleLbl.frame     = NSRect(x: DS.sidePad, y: 6, width: 200, height: 15)
+        addSubview(titleLbl)
 
-        titleLabel.font      = .systemFont(ofSize: 12)
-        titleLabel.textColor = DS.text
-        titleLabel.frame     = NSRect(x: 14, y: 3, width: 200, height: 14)
-        addSubview(titleLabel)
+        keyLbl.font        = DS.body(10)
+        keyLbl.textColor   = DS.textSecondary
+        keyLbl.alignment   = .right
+        keyLbl.frame       = NSRect(x: DS.popW - DS.sidePad - 44, y: 7, width: 44, height: 13)
+        addSubview(keyLbl)
 
-        keyLabel.font      = .systemFont(ofSize: 10, weight: .regular)
-        keyLabel.textColor = DS.textMuted
-        keyLabel.alignment = .right
-        keyLabel.frame     = NSRect(x: DS.popoverWidth - 60, y: 3, width: 46, height: 14)
-        addSubview(keyLabel)
+        titleLbl.stringValue = title
+        keyLbl.stringValue   = key
+    }
+    required init?(coder: NSCoder) { fatalError() }
 
-        // Hover tracking
-        addTrackingArea(NSTrackingArea(rect: bounds,
-                                       options: [.mouseEnteredAndExited, .activeAlways],
-                                       owner: self, userInfo: nil))
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let t = tracking { removeTrackingArea(t) }
+        tracking = NSTrackingArea(rect: bounds,
+                                  options: [.mouseEnteredAndExited, .activeAlways],
+                                  owner: self, userInfo: nil)
+        addTrackingArea(tracking!)
     }
 
-    func configure(title: String, keyEquiv: String) {
-        titleLabel.stringValue = title
-        keyLabel.stringValue   = keyEquiv
+    override func mouseEntered(with e: NSEvent) {
+        layer?.backgroundColor = DS.card.cgColor
     }
-
-    override func mouseEntered(with event: NSEvent) {
-        isHovered = true
-        layer?.backgroundColor = DS.surface2.cgColor
-    }
-    override func mouseExited(with event: NSEvent) {
-        isHovered = false
+    override func mouseExited(with e: NSEvent) {
         layer?.backgroundColor = NSColor.clear.cgColor
     }
-    override func mouseUp(with event: NSEvent) {
+    override func mouseUp(with e: NSEvent) {
+        layer?.backgroundColor = NSColor.clear.cgColor
         onTap?()
-        // Close menu
-        if let menu = enclosingMenuItem?.menu { menu.cancelTracking() }
+        enclosingMenuItem?.menu?.cancelTracking()
     }
 }
 
+// ═══════════════════════════════════════════════════════════
 // MARK: - ModernSettingsView
+// ═══════════════════════════════════════════════════════════
 
-class ModernSettingsView: NSView {
+final class ModernSettingsView: NSView {
 
-    private let brightnessController: BrightnessController
+    private let bc: BrightnessController
+    private let minSlider = AmberSlider()
+    private let maxSlider = AmberSlider()
+    private let minLbl    = NSTextField(labelWithString: "20%")
+    private let maxLbl    = NSTextField(labelWithString: "80%")
 
-    private let minSlider     = AmberGradientSlider()
-    private let maxSlider     = AmberGradientSlider()
-    private let minValueLabel = NSTextField(labelWithString: "20%")
-    private let maxValueLabel = NSTextField(labelWithString: "80%")
-
-    init(frame: NSRect, brightnessController: BrightnessController) {
-        self.brightnessController = brightnessController
+    init(frame: NSRect, controller: BrightnessController) {
+        self.bc = controller
         super.init(frame: frame)
+        wantsLayer            = true
+        layer?.backgroundColor = DS.bg.cgColor
         build()
     }
-    required init?(coder: NSCoder) { fatalError("Use init(frame:brightnessController:)") }
+    required init?(coder: NSCoder) { fatalError() }
 
     private func build() {
-        wantsLayer = true
-        layer?.backgroundColor = DS.surface.cgColor
+        let W = bounds.width   // 380
+        let P = DS.sidePad + 8 // 24
 
-        let W = bounds.width
-        let topY: CGFloat = bounds.height - 68
+        // ── Section heading ───────────────────────────────
+        let heading = label("MacBook Brightness Limits", font: DS.body(14, weight: .semibold), color: DS.textPrimary)
+        heading.frame = NSRect(x: P, y: 220, width: W - P*2, height: 20)
+        addSubview(heading)
 
-        // ── Section title ─────────────────────────────────────
-        let sectionTitle = NSTextField(labelWithString: "MacBook Brightness Limits")
-        sectionTitle.font      = .systemFont(ofSize: 14, weight: .semibold)
-        sectionTitle.textColor = DS.text
-        sectionTitle.frame     = NSRect(x: 24, y: topY + 14, width: W - 48, height: 20)
-        addSubview(sectionTitle)
+        let sub = wrappingLabel("Maps the slider (0–100%) to these MacBook brightness values.\nExternal monitors always use the full 0–100% range.",
+                                font: DS.body(11), color: DS.textSecondary)
+        sub.frame = NSRect(x: P, y: 178, width: W - P*2, height: 40)
+        addSubview(sub)
 
-        let sectionDesc = NSTextField(wrappingLabelWithString: "Maps the slider (0–100%) to these internal MacBook brightness values.\nExternal monitors always use 0–100%.")
-        sectionDesc.font      = .systemFont(ofSize: 11)
-        sectionDesc.textColor = DS.textMuted
-        sectionDesc.frame     = NSRect(x: 24, y: topY - 22, width: W - 48, height: 34)
-        addSubview(sectionDesc)
-
-        // ── Card background for sliders ───────────────────────
-        let card = NSView(frame: NSRect(x: 16, y: topY - 98, width: W - 32, height: 76))
-        card.wantsLayer           = true
-        card.layer?.backgroundColor = DS.surface2.cgColor
+        // ── Slider card ───────────────────────────────────
+        let card = NSView(frame: NSRect(x: 16, y: 90, width: W - 32, height: 84))
+        card.wantsLayer             = true
+        card.layer?.backgroundColor = DS.card.cgColor
         card.layer?.cornerRadius    = 10
         card.layer?.borderWidth     = 1
         card.layer?.borderColor     = DS.border.cgColor
         addSubview(card)
 
-        // -- Min row --
-        styleRowLabel("Minimum (0%)", in: card, frame: NSRect(x: 16, y: 44, width: 120, height: 16))
-        minSlider.frame = NSRect(x: 140, y: 40, width: card.bounds.width - 190, height: 22)
-        minSlider.setValue(Double(brightnessController.macBookCalibration.minBrightness * 100))
-        minSlider.onValueChanged = { [weak self] val in
+        let cW = card.bounds.width
+
+        // Min row (top of card)
+        let minRowLabel = label("Minimum · 0%", font: DS.body(11), color: DS.textPrimary)
+        minRowLabel.frame = NSRect(x: 14, y: 52, width: 100, height: 16)
+        card.addSubview(minRowLabel)
+
+        minSlider.frame = NSRect(x: 128, y: 48, width: cW - 128 - 54, height: 22)
+        minSlider.setValue(Double(bc.macBookCalibration.minBrightness * 100))
+        minSlider.onChanged = { [weak self] v in
             guard let self else { return }
-            self.brightnessController.macBookCalibration.minBrightness = Float(val) / 100.0
-            self.minValueLabel.stringValue = "\(Int(val))%"
+            self.bc.macBookCalibration.minBrightness = Float(v / 100)
+            self.minLbl.stringValue = "\(Int(v))%"
         }
         card.addSubview(minSlider)
-        styleValueLabel(minValueLabel, pct: Int(brightnessController.macBookCalibration.minBrightness * 100), in: card,
-                        frame: NSRect(x: card.bounds.width - 44, y: 44, width: 36, height: 16))
 
-        // Divider
-        let div = NSBox()
-        div.boxType    = .separator
-        div.frame      = NSRect(x: 16, y: 36, width: card.bounds.width - 32, height: 1)
-        div.borderColor = DS.separator
+        minLbl.font           = DS.mono(11, weight: .semibold)
+        minLbl.textColor      = DS.amber
+        minLbl.alignment      = .right
+        minLbl.stringValue    = "\(Int(bc.macBookCalibration.minBrightness * 100))%"
+        minLbl.frame          = NSRect(x: cW - 46, y: 52, width: 38, height: 16)
+        card.addSubview(minLbl)
+
+        // Divider within card
+        let div = NSView(frame: NSRect(x: 14, y: 42, width: cW - 28, height: 1))
+        div.wantsLayer            = true
+        div.layer?.backgroundColor = DS.divider.cgColor
         card.addSubview(div)
 
-        // -- Max row --
-        styleRowLabel("Maximum (100%)", in: card, frame: NSRect(x: 16, y: 14, width: 120, height: 16))
-        maxSlider.frame = NSRect(x: 140, y: 10, width: card.bounds.width - 190, height: 22)
-        maxSlider.setValue(Double(brightnessController.macBookCalibration.maxBrightness * 100))
-        maxSlider.onValueChanged = { [weak self] val in
+        // Max row (bottom of card)
+        let maxRowLabel = label("Maximum · 100%", font: DS.body(11), color: DS.textPrimary)
+        maxRowLabel.frame = NSRect(x: 14, y: 18, width: 100, height: 16)
+        card.addSubview(maxRowLabel)
+
+        maxSlider.frame = NSRect(x: 128, y: 14, width: cW - 128 - 54, height: 22)
+        maxSlider.setValue(Double(bc.macBookCalibration.maxBrightness * 100))
+        maxSlider.onChanged = { [weak self] v in
             guard let self else { return }
-            self.brightnessController.macBookCalibration.maxBrightness = Float(val) / 100.0
-            self.maxValueLabel.stringValue = "\(Int(val))%"
+            self.bc.macBookCalibration.maxBrightness = Float(v / 100)
+            self.maxLbl.stringValue = "\(Int(v))%"
         }
         card.addSubview(maxSlider)
-        styleValueLabel(maxValueLabel, pct: Int(brightnessController.macBookCalibration.maxBrightness * 100), in: card,
-                        frame: NSRect(x: card.bounds.width - 44, y: 14, width: 36, height: 16))
 
-        // ── Keyboard shortcuts pill row ───────────────────────
-        let kbLabel = NSTextField(labelWithString: "Shortcuts")
-        kbLabel.font      = .systemFont(ofSize: 11)
-        kbLabel.textColor = DS.textMuted
-        kbLabel.frame     = NSRect(x: 24, y: topY - 120, width: 70, height: 16)
-        addSubview(kbLabel)
+        maxLbl.font        = DS.mono(11, weight: .semibold)
+        maxLbl.textColor   = DS.amber
+        maxLbl.alignment   = .right
+        maxLbl.stringValue = "\(Int(bc.macBookCalibration.maxBrightness * 100))%"
+        maxLbl.frame       = NSRect(x: cW - 46, y: 18, width: 38, height: 16)
+        card.addSubview(maxLbl)
 
-        for (i, txt) in ["⌥ [  ▼", "⌥ ]  ▲"].enumerated() {
-            let pill = makePill(txt)
-            pill.frame = NSRect(x: 100 + CGFloat(i) * 80, y: topY - 122, width: 70, height: 20)
-            addSubview(pill)
+        // ── Shortcut pills ────────────────────────────────
+        let kbTitle = label("Keyboard shortcuts", font: DS.body(11), color: DS.textSecondary)
+        kbTitle.frame = NSRect(x: P, y: 62, width: 140, height: 16)
+        addSubview(kbTitle)
+
+        for (i, txt) in ["⌥ [   dim", "⌥ ]   bright"].enumerated() {
+            addSubview(makePill(txt, x: P + CGFloat(i) * 100, y: 40))
         }
 
-        // ── Reset button ──────────────────────────────────────
-        let resetBtn = NSButton(title: "Reset to Defaults", target: self, action: #selector(resetCalibration))
-        resetBtn.bezelStyle = .rounded
-        resetBtn.font       = .systemFont(ofSize: 11)
-        resetBtn.frame      = NSRect(x: 24, y: 18, width: 140, height: 26)
-        addSubview(resetBtn)
+        // ── Reset button ──────────────────────────────────
+        let btn = NSButton(title: "Reset to Defaults", target: self, action: #selector(reset))
+        btn.bezelStyle = .rounded
+        btn.font       = DS.body(11)
+        btn.frame      = NSRect(x: P, y: 14, width: 140, height: 26)
+        addSubview(btn)
     }
 
-    @discardableResult
-    private func styleRowLabel(_ text: String, in parent: NSView, frame: NSRect) -> NSTextField {
-        let lbl = NSTextField(labelWithString: text)
-        lbl.font      = .systemFont(ofSize: 11)
-        lbl.textColor = DS.text
-        lbl.frame     = frame
-        parent.addSubview(lbl)
-        return lbl
-    }
-
-    private func styleValueLabel(_ lbl: NSTextField, pct: Int, in parent: NSView, frame: NSRect) {
-        lbl.font           = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
-        lbl.textColor      = DS.amber
-        lbl.alignment      = .right
-        lbl.stringValue    = "\(pct)%"
-        lbl.frame          = frame
-        parent.addSubview(lbl)
-    }
-
-    private func makePill(_ text: String) -> NSView {
-        let v = NSView()
+    private func makePill(_ text: String, x: CGFloat, y: CGFloat) -> NSView {
+        let v = NSView(frame: NSRect(x: x, y: y, width: 92, height: 22))
         v.wantsLayer             = true
         v.layer?.backgroundColor = DS.amberDim.cgColor
         v.layer?.cornerRadius    = 6
         v.layer?.borderWidth     = 1
         v.layer?.borderColor     = DS.amber.withAlphaComponent(0.3).cgColor
-
         let lbl = NSTextField(labelWithString: text)
-        lbl.font      = .systemFont(ofSize: 10, weight: .medium)
+        lbl.font      = DS.body(10, weight: .medium)
         lbl.textColor = DS.amber
         lbl.alignment = .center
-        lbl.frame     = NSRect(x: 2, y: 3, width: 66, height: 14)
+        lbl.frame     = NSRect(x: 2, y: 4, width: 88, height: 14)
         v.addSubview(lbl)
         return v
     }
 
-    @objc private func resetCalibration() {
-        brightnessController.macBookCalibration = BrightnessCalibration(minBrightness: 0.20, maxBrightness: 0.80)
-        minSlider.setValue(20)
-        maxSlider.setValue(80)
-        minValueLabel.stringValue = "20%"
-        maxValueLabel.stringValue = "80%"
+    private func label(_ s: String, font: NSFont, color: NSColor) -> NSTextField {
+        let f = NSTextField(labelWithString: s); f.font = font; f.textColor = color; return f
     }
+    private func wrappingLabel(_ s: String, font: NSFont, color: NSColor) -> NSTextField {
+        let f = NSTextField(wrappingLabelWithString: s); f.font = font; f.textColor = color; return f
+    }
+
+    @objc private func reset() {
+        bc.macBookCalibration = BrightnessCalibration(minBrightness: 0.20, maxBrightness: 0.80)
+        minSlider.setValue(20); maxSlider.setValue(80)
+        minLbl.stringValue = "20%"; maxLbl.stringValue = "80%"
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// MARK: - Clamped helper
+// ═══════════════════════════════════════════════════════════
+extension Comparable {
+    func clamped(to r: ClosedRange<Self>) -> Self { min(max(self, r.lowerBound), r.upperBound) }
 }
