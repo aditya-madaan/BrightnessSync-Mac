@@ -2,36 +2,44 @@ import Cocoa
 import Carbon.HIToolbox
 import ApplicationServices
 
-// MARK: - Design Tokens (from Stitch HTML)
-// background-dark: #221e10  |  primary: #f4c025
-// slate-800/50 badges  |  emerald-500 sync dot  |  red-400/500 quit
+// MARK: - Design Tokens (macOS Tahoe / Liquid Glass — from BrightnessSync.html)
 private enum DS {
-    // Primary amber
-    static let primary       = NSColor(srgbRed: 0.957, green: 0.753, blue: 0.145, alpha: 1) // #f4c025
-    static let primarySubtle = NSColor(srgbRed: 0.957, green: 0.753, blue: 0.145, alpha: 0.20)
+    // Amber brand
+    static let primary       = NSColor(srgbRed: 0.957, green: 0.753, blue: 0.145, alpha: 1.00) // #f4c025
+    static let primaryGrad   = NSColor(srgbRed: 0.961, green: 0.620, blue: 0.043, alpha: 1.00) // #f59e0b
+    static let primaryDim    = NSColor(srgbRed: 0.957, green: 0.753, blue: 0.145, alpha: 0.16) // AMBER_DIM
 
-    // Surfaces  — warm dark, matching Stitch `rgba(34,30,16,0.75)`
-    static let bgWarm        = NSColor(srgbRed: 0.133, green: 0.118, blue: 0.063, alpha: 1)  // #221e10
-    static let bgCard        = NSColor(srgbRed: 0.117, green: 0.161, blue: 0.231, alpha: 0.5) // slate-800/50
-    static let bgCardHoverAmber = NSColor(srgbRed: 0.957, green: 0.753, blue: 0.145, alpha: 0.15)
-    static let bgCardHoverRed   = NSColor(srgbRed: 0.94,  green: 0.27,  blue: 0.27,  alpha: 0.18)
+    // Liquid Glass surfaces (dark)
+    static let glassBase     = NSColor(srgbRed: 0.110, green: 0.102, blue: 0.086, alpha: 0.55) // rgba(28,26,22,.55)
+    static let glassBorder   = NSColor(white: 1.0, alpha: 0.18)   // rgba(255,255,255,.18)
+    static let glassHighlight = NSColor(white: 1.0, alpha: 0.07)  // rgba(255,255,255,.07)
+    static let cardGlass     = NSColor(white: 1.0, alpha: 0.07)   // rgba(255,255,255,.07)
+    static let cardBorder    = NSColor(white: 1.0, alpha: 0.12)   // rgba(255,255,255,.12)
 
-    // Text
-    static let textPrimary  = NSColor(white: 0.92, alpha: 1)         // slate-100
-    static let textMuted    = NSColor(white: 0.62, alpha: 1)         // slate-400
-    static let textRed      = NSColor(srgbRed: 0.93, green: 0.40, blue: 0.40, alpha: 1)  // red-400
+    // Text (dark mode)
+    static let textPrimary   = NSColor(white: 1.0, alpha: 0.92)   // label
+    static let textMuted     = NSColor(white: 1.0, alpha: 0.55)   // labelSec
+    static let textTer       = NSColor(white: 1.0, alpha: 0.28)   // labelTer
 
-    // Status colours
-    static let emerald      = NSColor(srgbRed: 0.063, green: 0.725, blue: 0.506, alpha: 1) // emerald-500
-    static let divider      = NSColor(white: 1.0, alpha: 0.10)       // slate-700/50
+    // Status
+    static let emerald       = NSColor(srgbRed: 0.188, green: 0.820, blue: 0.345, alpha: 1) // #30d158
+    static let orange        = NSColor(srgbRed: 1.000, green: 0.584, blue: 0.000, alpha: 1) // #ff9500
+    static let textRed       = NSColor(srgbRed: 1.000, green: 0.231, blue: 0.188, alpha: 1) // #ff3b30
+
+    // Separator / track
+    static let divider       = NSColor(white: 1.0, alpha: 0.10)
+    static let trackBg       = NSColor(white: 1.0, alpha: 0.13)
+
+    // Hover fills
+    static let bgCardHoverAmber = NSColor(srgbRed: 0.957, green: 0.753, blue: 0.145, alpha: 0.16)
+    static let bgCardHoverRed   = NSColor(srgbRed: 1.000, green: 0.231, blue: 0.188, alpha: 0.18)
 
     // Layout constants
-    static let popW: CGFloat    = 280   // w-[280px]
-    static let px: CGFloat      = 16    // px-4
-    static let badgePx: CGFloat = 10    // px-2.5
-    static let badgePy: CGFloat = 7     // py-1.5
-    static let badgeGap: CGFloat = 8    // gap-2
-    static let sectionGap: CGFloat = 16 // gap-4
+    static let popW: CGFloat     = 280
+    static let px: CGFloat       = 16
+    static let badgePx: CGFloat  = 10
+    static let badgeGap: CGFloat = 7   // gap between badges (design: 7px)
+    static let sectionGap: CGFloat = 16
 
     static func body(_ size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
         .systemFont(ofSize: size, weight: weight)
@@ -156,27 +164,69 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrightnessChangeDelegate {
             backing: .buffered, defer: false
         )
         win.title = "Calibration Settings"
+        win.titleVisibility = .hidden
+        win.titlebarAppearsTransparent = true
         win.center()
         win.isReleasedWhenClosed = false
+        win.appearance = NSAppearance(named: .darkAqua)
 
-        // Glassmorphic base: NSVisualEffectView (backdrop-blur)
-        let vfx = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: 350, height: 220))
-        vfx.material        = .underWindowBackground
-        vfx.blendingMode    = .behindWindow
-        vfx.state           = .active
-        vfx.appearance      = NSAppearance(named: .darkAqua)
+        // Liquid Glass: vibrancy + warm glass overlay
+        let vfx = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: 390, height: 220))
+        vfx.material     = .hudWindow
+        vfx.blendingMode = .behindWindow
+        vfx.state        = .active
 
-        // Dark overlay (bg-black/40)
-        let overlay = NSView(frame: vfx.bounds)
-        overlay.wantsLayer             = true
-        overlay.layer?.backgroundColor = NSColor(white: 0, alpha: 0.55).cgColor
-        vfx.addSubview(overlay)
+        let warmOverlay = NSView(frame: vfx.bounds)
+        warmOverlay.wantsLayer             = true
+        warmOverlay.layer?.backgroundColor = DS.glassBase.cgColor
+        vfx.addSubview(warmOverlay)
+
+        // Glass title bar (38pt) with traffic lights + centred title
+        let titleBar = NSView(frame: NSRect(x: 0, y: 182, width: 390, height: 38))
+        titleBar.wantsLayer             = true
+        titleBar.layer?.backgroundColor = DS.glassHighlight.cgColor
+
+        let trafficColors: [NSColor] = [
+            NSColor(srgbRed: 1.0, green: 0.451, blue: 0.416, alpha: 1),
+            NSColor(srgbRed: 0.996, green: 0.737, blue: 0.180, alpha: 1),
+            NSColor(srgbRed: 0.188, green: 0.820, blue: 0.345, alpha: 1),
+        ]
+        for (i, c) in trafficColors.enumerated() {
+            let dot = NSView(frame: NSRect(x: 14 + i * 20, y: 13, width: 12, height: 12))
+            dot.wantsLayer             = true
+            dot.layer?.backgroundColor = c.cgColor
+            dot.layer?.cornerRadius    = 6
+            dot.layer?.borderWidth     = 0.5
+            dot.layer?.borderColor     = NSColor(white: 0, alpha: 0.18).cgColor
+            titleBar.addSubview(dot)
+        }
+
+        let titleLbl = NSTextField(labelWithString: "Calibration Settings")
+        titleLbl.font      = DS.body(13, weight: .semibold)
+        titleLbl.textColor = DS.textPrimary
+        titleLbl.alignment = .center
+        titleLbl.frame     = NSRect(x: 80, y: 10, width: 230, height: 18)
+        titleBar.addSubview(titleLbl)
+
+        let sep = NSView(frame: NSRect(x: 0, y: 0, width: 390, height: 1))
+        sep.wantsLayer             = true
+        sep.layer?.backgroundColor = DS.divider.cgColor
+        titleBar.addSubview(sep)
+        vfx.addSubview(titleBar)
+
+        // Glass content card
+        let contentCard = NSView(frame: NSRect(x: 0, y: 0, width: 390, height: 182))
+        contentCard.wantsLayer             = true
+        contentCard.layer?.backgroundColor = DS.cardGlass.cgColor
 
         let content = CalibrationSettingsView(
-            frame: NSRect(x: 0, y: 0, width: 350, height: 220),
+            frame: NSRect(x: 0, y: 0, width: 390, height: 182),
             controller: brightnessController
         )
-        vfx.addSubview(content)
+        contentCard.addSubview(content)
+        vfx.addSubview(contentCard)
+
+        win.setContentSize(NSSize(width: 390, height: 220))
         win.contentView = vfx
         settingsWindow = win
     }
@@ -219,9 +269,34 @@ final class BrightnessSyncPopover: NSView {
         self.onQuit     = onQuit
         super.init(frame: NSRect(x: 0, y: 0, width: DS.popW, height: Self.totalH))
         wantsLayer = true
-        layer?.backgroundColor = DS.bgWarm.cgColor
-        layer?.borderWidth     = 1
-        layer?.borderColor     = NSColor(white: 1, alpha: 0.10).cgColor
+        layer?.cornerRadius    = 14
+        layer?.masksToBounds   = true
+
+        // Liquid Glass base: vibrancy backdrop + warm tint overlay
+        let vfx = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: DS.popW, height: Self.totalH))
+        vfx.material     = .hudWindow
+        vfx.blendingMode = .behindWindow
+        vfx.state        = .active
+        vfx.autoresizingMask = [.width, .height]
+        addSubview(vfx)
+
+        let tint = NSView(frame: vfx.bounds)
+        tint.wantsLayer             = true
+        tint.layer?.backgroundColor = DS.glassBase.cgColor
+        tint.autoresizingMask       = [.width, .height]
+        addSubview(tint)
+
+        // Edge specular highlight (top edge)
+        let highlight = NSView(frame: NSRect(x: 0, y: frame.height - 1, width: DS.popW, height: 1))
+        highlight.wantsLayer             = true
+        highlight.layer?.backgroundColor = DS.glassHighlight.cgColor
+        highlight.autoresizingMask       = [.width]
+        addSubview(highlight)
+
+        // Glass border ring
+        layer?.borderWidth = 0.75
+        layer?.borderColor = DS.glassBorder.cgColor
+
         buildUI()
     }
     required init?(coder: NSCoder) { fatalError() }
@@ -250,9 +325,9 @@ final class BrightnessSyncPopover: NSView {
         y += menuItemH + 2 // mt-0.5
 
         // Settings button
-        let settingsBtn = MenuItemRow(title: "Calibration Settings...",
+        let settingsBtn = MenuItemRow(title: "Calibration Settings…",
                                       sfRightIcon: "gearshape",
-                                      hoverColor: DS.primarySubtle,
+                                      hoverColor: DS.primaryDim,
                                       hoverTextColor: DS.primary)
         settingsBtn.frame = NSRect(x: menuPx, y: y, width: W - menuPx*2, height: menuItemH)
         settingsBtn.onTap = { [weak self] in self?.onSettings() }
@@ -269,21 +344,21 @@ final class BrightnessSyncPopover: NSView {
 
         // Display badge
         dispBadge.setIcon(sfSymbol: "display", text: "1 display connected")
-        dispBadge.frame = NSRect(x: px, y: y, width: W - px*2, height: 32)
+        dispBadge.frame = NSRect(x: px, y: y, width: W - px*2, height: 28)
         addSubview(dispBadge)
-        y += 32 + DS.badgeGap  // +8 gap
+        y += 28 + DS.badgeGap
 
         // Keyboard badge
         kbBadge.setIcon(sfSymbol: "keyboard", text: "⌥[ / ] shortcuts active")
-        kbBadge.frame = NSRect(x: px, y: y, width: W - px*2, height: 32)
+        kbBadge.frame = NSRect(x: px, y: y, width: W - px*2, height: 28)
         addSubview(kbBadge)
-        y += 32 + DS.badgeGap  // +8 gap
+        y += 28 + DS.badgeGap
 
         // Sync badge (green dot only, no icon)
         let syncBadge = SyncBadgeCard(text: "Syncing with F1 / F2")
-        syncBadge.frame = NSRect(x: px, y: y, width: W - px*2, height: 32)
+        syncBadge.frame = NSRect(x: px, y: y, width: W - px*2, height: 28)
         addSubview(syncBadge)
-        y += 32
+        y += 28
 
         // gap-4 between badges and brightness
         y += DS.sectionGap  // 16
@@ -318,25 +393,34 @@ final class BrightnessSyncPopover: NSView {
         y += 1
 
         // ─── Header Section ───────────────────────────────
-        // pt-4 (16) + icon+title (20) + pb-2 (8) = 44
-        y += 8  // pb-2
+        // header: 42pt tall, pb-2 (8pt) + icon(28pt) centre = y+7 for icon, then pt-3(gap to divider)
+        y += 7  // bottom pad
 
-        // Sun icon — amber tinted SF Symbol
+        // Sun icon glass pill — 28×28, LiquidGlass bubble
+        let pillW: CGFloat = 28
+        let pill = NSView(frame: NSRect(x: px, y: y, width: pillW, height: pillW))
+        pill.wantsLayer             = true
+        pill.layer?.cornerRadius    = 10
+        pill.layer?.backgroundColor = DS.cardGlass.cgColor
+        pill.layer?.borderWidth     = 0.75
+        pill.layer?.borderColor     = DS.cardBorder.cgColor
+
         let sunView = NSImageView()
-        let sunCfg  = NSImage.SymbolConfiguration(pointSize: 17, weight: .semibold)
+        let sunCfg  = NSImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
         if let img = NSImage(systemSymbolName: "sun.max.fill", accessibilityDescription: nil)?
                         .withSymbolConfiguration(sunCfg) {
             sunView.image = img
         }
         sunView.contentTintColor = DS.primary
         sunView.imageScaling     = .scaleProportionallyUpOrDown
-        sunView.frame            = NSRect(x: px, y: y, width: 20, height: 20)
-        addSubview(sunView)
+        sunView.frame            = NSRect(x: 6, y: 6, width: 16, height: 16)
+        pill.addSubview(sunView)
+        addSubview(pill)
 
         let titleField = makeText("BrightnessSync", font: DS.body(13, weight: .semibold), color: DS.textPrimary)
-        titleField.frame = NSRect(x: px + 28, y: y, width: 180, height: 20)
+        titleField.frame = NSRect(x: px + pillW + 8, y: y + 5, width: 180, height: 18)
         addSubview(titleField)
-        y += 20 + 16  // pt-4
+        y += pillW + 7  // top pad to reach total header ~42pt
 
         // Resize self to actual content height
         let finalH = y
@@ -403,12 +487,15 @@ final class StitchSlider: NSView {
 
         // h-1.5 track = 6px, rounded-full, dark bg
         trackBg.cornerRadius    = 3
-        trackBg.backgroundColor = NSColor(white: 1, alpha: 0.15).cgColor
+        trackBg.backgroundColor = DS.trackBg.cgColor
         layer?.addSublayer(trackBg)
 
-        // amber gradient fill: from-amber-500 to-primary
-        let amber500 = NSColor(srgbRed: 0.961, green: 0.620, blue: 0.043, alpha: 1)
-        trackFill.colors      = [amber500.cgColor, DS.primary.cgColor]
+        // amber gradient fill + glow shadow
+        trackFill.colors      = [DS.primaryGrad.cgColor, DS.primary.cgColor]
+        trackFill.shadowColor  = DS.primary.cgColor
+        trackFill.shadowRadius = 4
+        trackFill.shadowOpacity = 0.40
+        trackFill.shadowOffset  = .zero
         trackFill.startPoint  = CGPoint(x: 0, y: 0.5)
         trackFill.endPoint    = CGPoint(x: 1, y: 0.5)
         trackFill.cornerRadius = 3
@@ -486,9 +573,10 @@ final class BadgeCard: NSView {
 
     private func build() {
         wantsLayer             = true
-        // bg-slate-800/50  rounded-md
-        layer?.backgroundColor = NSColor(srgbRed: 0.117, green: 0.161, blue: 0.231, alpha: 0.50).cgColor
-        layer?.cornerRadius    = 6  // rounded-md
+        layer?.backgroundColor = DS.cardGlass.cgColor
+        layer?.cornerRadius    = 10
+        layer?.borderWidth     = 0.75
+        layer?.borderColor     = DS.cardBorder.cgColor
 
         // gap-2 = 8px, px-2.5 = 10px, py-1.5 = 6px
         // icon 16×16 at x=10, centered vertically
@@ -498,7 +586,7 @@ final class BadgeCard: NSView {
 
         label.font      = DS.body(11, weight: .medium)
         label.textColor = DS.textPrimary
-        label.frame     = NSRect(x: 32, y: 9, width: 200, height: 14)
+        label.frame     = NSRect(x: 32, y: 7, width: 200, height: 14)
         addSubview(label)
     }
 
@@ -532,20 +620,26 @@ final class SyncBadgeCard: NSView {
 
     private func build(text: String) {
         wantsLayer             = true
-        layer?.backgroundColor = NSColor(srgbRed: 0.117, green: 0.161, blue: 0.231, alpha: 0.50).cgColor
-        layer?.cornerRadius    = 6
+        layer?.backgroundColor = DS.cardGlass.cgColor
+        layer?.cornerRadius    = 10
+        layer?.borderWidth     = 0.75
+        layer?.borderColor     = DS.cardBorder.cgColor
 
-        // w-2 h-2 rounded-full bg-emerald-500
+        // 8×8 dot with glow — #30d158
         dot.wantsLayer             = true
         dot.layer?.backgroundColor = DS.emerald.cgColor
         dot.layer?.cornerRadius    = 4
-        dot.frame                  = NSRect(x: 10, y: 12, width: 8, height: 8)
+        dot.layer?.shadowColor     = DS.emerald.cgColor
+        dot.layer?.shadowRadius    = 3
+        dot.layer?.shadowOpacity   = 0.60
+        dot.layer?.shadowOffset    = .zero
+        dot.frame                  = NSRect(x: 10, y: 10, width: 8, height: 8)
         addSubview(dot)
 
         label.font        = DS.body(11, weight: .medium)
         label.textColor   = DS.textPrimary
         label.stringValue = text
-        label.frame       = NSRect(x: 26, y: 9, width: 210, height: 14)
+        label.frame       = NSRect(x: 26, y: 7, width: 210, height: 14)
         addSubview(label)
     }
 }
@@ -574,13 +668,12 @@ final class MenuItemRow: NSView {
         self.hoverTextColor = hoverTextColor
         super.init(frame: .zero)
         wantsLayer        = true
-        layer?.cornerRadius = 6  // rounded
+        layer?.cornerRadius = 8
 
-        // Title: px-3 = 12px, centred vertically at py-1.5
-        titleLabel.font        = DS.body(12)
+        titleLabel.font        = DS.body(13)
         titleLabel.textColor   = DS.textPrimary
         titleLabel.stringValue = title
-        titleLabel.frame       = NSRect(x: 12, y: 8, width: 200, height: 14)
+        titleLabel.frame       = NSRect(x: 12, y: 7, width: 200, height: 14)
         addSubview(titleLabel)
 
         if let txt = rightText {
@@ -652,55 +745,43 @@ final class CalibrationSettingsView: NSView {
     }
     required init?(coder: NSCoder) { fatalError() }
 
-    // Layout constants from Stitch HTML
-    // Window: 350px, p-4=16px all sides, gap-4=16px between sections, gap-3=12px between rows
     private func buildLayout() {
-        let W:   CGFloat = 350
-        let p:   CGFloat = 16   // p-4
-        let g4:  CGFloat = 16   // gap-4
-        let g3:  CGFloat = 12   // gap-3
-        // Label width: w-24 = 96px
-        let lblW: CGFloat = 96
-        // Value width: w-6 = 24px
+        let W:    CGFloat = 390
+        let p:    CGFloat = 16
+        let g4:   CGFloat = 16
+        let g3:   CGFloat = 12
+        let lblW: CGFloat = 104   // w-26 (design: 104px)
         let valW: CGFloat = 26
-        // gap-2 = 8px between label | track | value
-        let g2: CGFloat = 8
-        // Slider row height: 24px (items-center, track 6px centred)
+        let g2:   CGFloat = 8
         let rowH: CGFloat = 24
-        // Bottom action row height
-        let actH: CGFloat = 26
-        // Border-t + pt-3 = 12px, mt-2 = 8px
-        let actTopSpace: CGFloat = 8 + 1 + 12
+        let actH: CGFloat = 22
+        let actTopSpace: CGFloat = 1 + 16 + 8   // sep + pt-4 + mt-2
 
-        // Build bottom → top (NS coord system)
-        var y: CGFloat = p  // bottom p-4 padding
+        var y: CGFloat = p
 
-        // ── Bottom row (border-t, justify-between) ────────────
-        // Left: Reset to Defaults button  (text-[10px] px-2 py-1 border rounded)
+        // ── Bottom row ────────────────────────────────────────
         let resetBtn = SmallOutlineButton(title: "Reset to Defaults",
                                           target: self, action: #selector(resetCalibration))
-        resetBtn.frame = NSRect(x: p, y: y, width: 112, height: actH)
+        resetBtn.frame = NSRect(x: p, y: y, width: 116, height: actH)
         addSubview(resetBtn)
 
-        // Right: ⌥[ and ⌥] pills (px-1.5 py-0.5 bg-white/10 border font-mono text-[10px])
-        let pill2 = makePill("⌥ ]")
-        pill2.frame = NSRect(x: W - p - 36, y: y + 4, width: 36, height: 18)
+        let pill2 = makePill("⌥]")
+        pill2.frame = NSRect(x: W - p - 36, y: y + 2, width: 36, height: 18)
         addSubview(pill2)
 
-        let pill1 = makePill("⌥ [")
-        pill1.frame = NSRect(x: W - p - 36 - 8 - 36, y: y + 4, width: 36, height: 18)
+        let pill1 = makePill("⌥[")
+        pill1.frame = NSRect(x: W - p - 36 - 6 - 36, y: y + 2, width: 36, height: 18)
         addSubview(pill1)
 
-        y += actH + actTopSpace  // border-t separator space
+        y += actH + actTopSpace
 
-        // Full-width border-t (border-white/5)
+        // Full-width separator
         let sep = NSView(frame: NSRect(x: p, y: y - 1, width: W - p*2, height: 1))
-        sep.wantsLayer            = true
-        sep.layer?.backgroundColor = NSColor(white: 1, alpha: 0.07).cgColor
+        sep.wantsLayer             = true
+        sep.layer?.backgroundColor = DS.divider.cgColor
         addSubview(sep)
 
         // ── Max slider row ────────────────────────────────────
-        // (gap-3 above, so skip 12px)
         y += g3
         let trackW = W - p*2 - lblW - g2 - valW - g2
 
@@ -720,11 +801,9 @@ final class CalibrationSettingsView: NSView {
         }
         addSubview(maxSlider)
 
-        let maxLbl2 = lbl("Maximum (100%)", font: DS.body(11, weight: .medium),
-                          color: NSColor(white: 0.80, alpha: 1))
+        let maxLbl2 = lbl("Maximum (100%)", font: DS.body(11, weight: .medium), color: DS.textPrimary)
         maxLbl2.frame = NSRect(x: p, y: y + 5, width: lblW, height: 14)
         addSubview(maxLbl2)
-
         y += rowH
 
         // ── Min slider row ────────────────────────────────────
@@ -746,28 +825,21 @@ final class CalibrationSettingsView: NSView {
         }
         addSubview(minSlider)
 
-        let minLbl2 = lbl("Minimum (0%)", font: DS.body(11, weight: .medium),
-                          color: NSColor(white: 0.80, alpha: 1))
+        let minLbl2 = lbl("Minimum (0%)", font: DS.body(11, weight: .medium), color: DS.textPrimary)
         minLbl2.frame = NSRect(x: p, y: y + 5, width: lblW, height: 14)
         addSubview(minLbl2)
+        y += rowH + g4
 
-        y += rowH
-
-        // gap-4 between sliders section and header
-        y += g4
-
-        // ── Description (text-xs text-slate-400) ──────────────
-        let desc = NSTextField(wrappingLabelWithString: "Adjust the allowed brightness range for your display.")
-        desc.font      = DS.body(11)
+        // ── Description ───────────────────────────────────────
+        let desc = NSTextField(wrappingLabelWithString: "Adjust the brightness range mapped to your external display.")
+        desc.font      = DS.body(10)
         desc.textColor = DS.textMuted
         desc.frame     = NSRect(x: p, y: y, width: W - p*2, height: 14)
         addSubview(desc)
-        y += 14 + 4  // mt-1 = 4px
+        y += 18
 
-        // ── Section heading (text-sm font-bold) ───────────────
-        let heading = lbl("MacBook Brightness Limits",
-                          font: DS.body(13, weight: .bold),
-                          color: NSColor(white: 0.94, alpha: 1))
+        // ── Section heading ───────────────────────────────────
+        let heading = lbl("MacBook Brightness Limits", font: DS.body(13, weight: .semibold), color: DS.textPrimary)
         heading.frame = NSRect(x: p, y: y, width: W - p*2, height: 18)
         addSubview(heading)
     }
@@ -777,17 +849,16 @@ final class CalibrationSettingsView: NSView {
         let f = NSTextField(labelWithString: s); f.font = font; f.textColor = color; return f
     }
 
-    // key pill: px-1.5 py-0.5 bg-white/10 border border-white/10 text-[10px] font-mono
     private func makePill(_ text: String) -> NSView {
         let v = NSView()
         v.wantsLayer             = true
-        v.layer?.backgroundColor = NSColor(white: 1, alpha: 0.10).cgColor
-        v.layer?.cornerRadius    = 4
-        v.layer?.borderWidth     = 1
-        v.layer?.borderColor     = NSColor(white: 1, alpha: 0.12).cgColor
+        v.layer?.backgroundColor = DS.cardGlass.cgColor
+        v.layer?.cornerRadius    = 5
+        v.layer?.borderWidth     = 0.75
+        v.layer?.borderColor     = DS.cardBorder.cgColor
         let l = NSTextField(labelWithString: text)
         l.font      = .monospacedSystemFont(ofSize: 10, weight: .regular)
-        l.textColor = NSColor(white: 0.78, alpha: 1)  // slate-300
+        l.textColor = DS.textMuted
         l.alignment = .center
         l.frame     = NSRect(x: 2, y: 2, width: 32, height: 14)
         v.addSubview(l)
@@ -814,13 +885,13 @@ final class SmallOutlineButton: NSView {
         self.action = action
         super.init(frame: .zero)
         wantsLayer             = true
-        layer?.cornerRadius    = 4
-        layer?.borderWidth     = 1
-        layer?.borderColor     = NSColor(white: 1, alpha: 0.12).cgColor
-        layer?.backgroundColor = NSColor.clear.cgColor
+        layer?.cornerRadius    = 6
+        layer?.borderWidth     = 0.75
+        layer?.borderColor     = DS.cardBorder.cgColor
+        layer?.backgroundColor = DS.cardGlass.cgColor
 
-        label.font        = DS.body(10)
-        label.textColor   = NSColor(white: 0.60, alpha: 1)  // slate-400/500
+        label.font        = DS.body(11)
+        label.textColor   = DS.textMuted
         label.alignment   = .center
         label.stringValue = title
         label.frame       = NSRect(x: 4, y: 6, width: 104, height: 14)
@@ -836,12 +907,8 @@ final class SmallOutlineButton: NSView {
                                   owner: self, userInfo: nil)
         addTrackingArea(tracking!)
     }
-    override func mouseEntered(with e: NSEvent) {
-        label.textColor = NSColor(white: 0.92, alpha: 1)  // hover:text-slate-200
-    }
-    override func mouseExited(with e: NSEvent) {
-        label.textColor = NSColor(white: 0.60, alpha: 1)
-    }
+    override func mouseEntered(with e: NSEvent) { label.textColor = DS.textPrimary }
+    override func mouseExited(with e: NSEvent)  { label.textColor = DS.textMuted }
     override func mouseUp(with e: NSEvent) {
         NSApp.sendAction(action, to: target, from: self)
     }
