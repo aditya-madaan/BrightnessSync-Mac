@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import CoreGraphics
 
 /// Represents a display
@@ -6,7 +7,9 @@ struct Display {
     let id: CGDirectDisplayID
     let isBuiltIn: Bool
     let name: String
-    
+    /// CFUUID string — stable identifier across sessions, suitable as a UserDefaults key.
+    let uuid: String?
+
     var isExternal: Bool { !isBuiltIn }
 }
 
@@ -45,8 +48,9 @@ class DisplayManager {
             let displayID = displayIDs[index]
             let isBuiltIn = CGDisplayIsBuiltin(displayID) != 0
             let name = getDisplayName(for: displayID) ?? "Display \(index + 1)"
-            
-            return Display(id: displayID, isBuiltIn: isBuiltIn, name: name)
+            let uuid = getUUID(for: displayID)
+
+            return Display(id: displayID, isBuiltIn: isBuiltIn, name: name, uuid: uuid)
         }
         
         lastRefresh = Date()
@@ -58,22 +62,44 @@ class DisplayManager {
         }
     }
     
+    /// Stable per-display identifier built from EDID vendor + model + serial.
+    /// Survives reboots, hotplug, and reconnection — suitable as a UserDefaults key.
+    /// For displays missing one of these fields, the corresponding slot is 0;
+    /// two identical-model displays without serials would collide (rare edge case).
+    private func getUUID(for displayID: CGDirectDisplayID) -> String? {
+        let vendor = CGDisplayVendorNumber(displayID)
+        let model  = CGDisplayModelNumber(displayID)
+        let serial = CGDisplaySerialNumber(displayID)
+        if vendor == 0 && model == 0 && serial == 0 { return nil }
+        return "v\(vendor)_m\(model)_s\(serial)"
+    }
+
+    /// Returns the display's user-facing name (EDID product name).
+    /// Prefers NSScreen.localizedName — the reliable path on Apple Silicon.
+    /// Falls back to the legacy IOKit IODisplayConnect lookup for older edge cases.
     private func getDisplayName(for displayID: CGDirectDisplayID) -> String? {
-        // Try to get the display name from IOKit via IORegistryEntryCreateCFProperties
+        // Modern path: NSScreen exposes the localized name per display.
+        if let screen = NSScreen.screens.first(where: {
+            ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?
+                .uint32Value == displayID
+        }) {
+            let name = screen.localizedName
+            if !name.isEmpty { return name }
+        }
+        // Legacy path: IODisplayConnect (often empty on Apple Silicon, kept as fallback).
+        return getDisplayNameFromIOKit()
+    }
+
+    private func getDisplayNameFromIOKit() -> String? {
         var iterator: io_iterator_t = 0
-        
         let result = IOServiceGetMatchingServices(
             kIOMainPortDefault,
             IOServiceMatching("IODisplayConnect"),
             &iterator
         )
-        
-        guard result == kIOReturnSuccess else {
-            return nil
-        }
-        
+        guard result == kIOReturnSuccess else { return nil }
         defer { IOObjectRelease(iterator) }
-        
+
         var service = IOIteratorNext(iterator)
         while service != 0 {
             var properties: Unmanaged<CFMutableDictionary>?
@@ -87,7 +113,6 @@ class DisplayManager {
             IOObjectRelease(service)
             service = IOIteratorNext(iterator)
         }
-        
         return nil
     }
 }

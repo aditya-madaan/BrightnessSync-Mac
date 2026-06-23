@@ -7,10 +7,10 @@ set -e
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BUILD_DIR="$PROJECT_DIR/build"
-APP_NAME="BrightnessSync Mac"
-EXECUTABLE_NAME="BrightnessSyncMac"
+APP_NAME="Tandem"
+EXECUTABLE_NAME="Tandem"
 APP_BUNDLE="$BUILD_DIR/$APP_NAME.app"
-DMG_NAME="BrightnessSyncMac.dmg"
+DMG_NAME="Tandem.dmg"
 
 echo "🔨 Building $APP_NAME..."
 

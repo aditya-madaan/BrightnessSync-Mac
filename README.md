@@ -1,115 +1,85 @@
-# BrightnessSync Mac ☀️
+# Tandem
 
-A lightweight macOS menu bar app that syncs brightness between your MacBook and external monitors. When you press F1/F2 or adjust brightness via Control Center, your external monitor automatically follows!
+A lightweight macOS menu bar app that keeps your MacBook and external monitors in sync — one slider, every screen.
 
 ![macOS](https://img.shields.io/badge/macOS-12.0+-blue)
 ![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-M1%2FM2%2FM3%2FM4-green)
 ![License](https://img.shields.io/badge/license-MIT-brightgreen)
 
-## ✨ Features
+## What it does
 
-- ☀️ **Unified Brightness Control** - Single slider syncs all displays
-- 🎹 **Native F1/F2 Keys** - Works automatically with your keyboard
-- ⌨️ **Custom Shortcuts** - Ctrl+Shift+↑/↓ for mechanical keyboards
-- 🔌 **Auto-Detect** - Monitors plug/unplug detection
-- ⚙️ **Calibration Settings** - Customize min/max brightness limits
-- 🖥️ **Multi-Display** - Controls all connected external monitors
-- ⚡ **Lightweight** - Pure Swift, ~100KB, no background CPU usage
+- **Unified brightness control** — change brightness once, every connected display follows.
+- **Native F1 / F2 keys** — the keys you already use, now wired to your external monitors too.
+- **Custom shortcuts** — Option + [ / ] work from any keyboard (mechanical, external, USB).
+- **Real DDC where available** — backlight control via `m1ddc` on USB-C / DisplayPort displays.
+- **Software dim fallback** — GPU gamma scaling automatically takes over when DDC isn't supported (HDMI, docks, adapters). Survives fullscreen, Spaces, and screen recording.
+- **Per-display calibration** — each monitor gets its own min/max brightness range.
+- **Auto-detect** — hotplug a monitor and Tandem syncs it within a second, no clicks.
+- **Native macOS UI** — system fonts, system colors, light/dark mode, no custom chrome.
 
-## ⌨️ Keyboard Shortcuts
+## Install
 
-| Shortcut | Action | Notes |
-|----------|--------|-------|
-| **F1 / F2** | Brightness Down / Up | Native MacBook keys, auto-sync |
-| **Option+]** | Brightness Up | Works from any keyboard |
-| **Option+[** | Brightness Down | Works from any keyboard |
+### 1. Install m1ddc (optional but recommended)
 
-> **Note**: Custom shortcuts require Accessibility permissions. The app will prompt you on first launch.
-
-## 📥 Installation
-
-### 1. Install m1ddc (Required)
 ```bash
 brew install m1ddc
 ```
 
-### 2. Download the App
-Download `BrightnessSyncMac.dmg` from the [Releases](../../releases) page.
+m1ddc enables real backlight control over USB-C and DisplayPort. Without it, Tandem still works — it falls back to software gamma dimming for every external display.
 
-### 3. Install & Fix Gatekeeper
+### 2. Download and run
+
+Grab `Tandem.dmg` from [Releases](../../releases), drag the app into `/Applications`, then strip the quarantine attribute so macOS doesn't block it:
+
 ```bash
-# Drag app to Applications, then run:
-xattr -cr "/Applications/BrightnessSync Mac.app"
+xattr -cr "/Applications/Tandem.app"
 ```
 
-### 4. Launch
-Open BrightnessSync Mac from Applications. A ☀️ icon appears in your menu bar.
+Open Tandem from Applications. A ☀ icon appears in your menu bar.
 
-## 🎮 Usage
+## Usage
 
-- **F1/F2 Keys**: Just use them normally - external monitor follows automatically
-- **Menu Bar Slider**: Click the ☀️ icon and drag the slider
-- **Control Center**: Brightness changes sync to external monitors
+- **F1 / F2** — adjust brightness; externals follow.
+- **Option + [ / ]** — same, works on any keyboard.
+- **Menu bar slider** — drag for fine control.
+- **Calibration Settings…** — per-display min/max ranges.
 
-## ⚙️ Calibration Settings
+## Connection support
 
-Click ☀️ → "Calibration Settings..." to customize:
+| Connection | Mode | Notes |
+|------------|------|-------|
+| USB-C / Thunderbolt | DDC (real backlight) | Best option. |
+| DisplayPort | DDC (real backlight) | Direct or via USB-C → DP adapter. |
+| HDMI direct | Software dim (gamma) | Apple Silicon doesn't support DDC over native HDMI. |
+| HDMI via dock | Software dim (gamma) | Most docks block DDC; Tandem detects this and falls back automatically. |
+| Mixed setup | Per-display routing | Each display picks the best available mode independently. |
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| Minimum | 20% | MacBook brightness when slider is at 0% |
-| Maximum | 80% | MacBook brightness when slider is at 100% |
+You can see the chosen mode for each display in the menu bar dropdown — `DDC` (green) or `Software` (yellow).
 
-This prevents your MacBook from going too dim or too bright relative to your external monitor.
+## Calibration
 
-## ⚠️ Important: Connection Type Matters
+Open ☀ → **Calibration Settings…** for per-display sliders:
 
-### ✅ Supported Connections
-| Connection | DDC Support | Notes |
-|------------|-------------|-------|
-| **USB-C / Thunderbolt** | ✅ Works | Best option |
-| **DisplayPort** | ✅ Works | Use USB-C to DP adapter |
+- **MacBook Display** — defaults 20% min, 80% max. Prevents the built-in display from going pitch black or blinding-white at slider extremes.
+- **Each external** — defaults 20% min, 100% max. Raise the minimum if 0% feels too dim; lower the maximum to cap the display's brightness ceiling.
 
-### ❌ Not Supported
-| Connection | DDC Support | Notes |
-|------------|-------------|-------|
-| **HDMI** | ❌ Doesn't work | Apple Silicon limitation |
-| **HDMI Adapters** | ❌ Rarely works | Most adapters block DDC |
+Calibration is per-display, persisted across reboots, and identified by EDID (vendor + model + serial), so disconnecting and reconnecting the same monitor preserves its settings.
 
-### Why HDMI Doesn't Work
+## Troubleshooting
 
-On Apple Silicon Macs, **HDMI connections do not reliably support DDC/CI** (the protocol used to control monitor brightness). This is a hardware/driver limitation in macOS, not something any software can fix.
-
-**If you're using HDMI:**
-- Switch to **USB-C** or **DisplayPort** connection
-- Use a **USB-C to DisplayPort adapter** instead of HDMI
-- Some monitors have USB-C input that supports DDC
-
-**To verify your monitor supports DDC, run:**
+**"App is damaged" error:**
 ```bash
-m1ddc set luminance 50
-```
-If you see `DDC communication failure`, your connection doesn't support brightness control.
-
-## 🔧 Troubleshooting
-
-### "App is damaged" error
-```bash
-xattr -cr "/Applications/BrightnessSync Mac.app"
+xattr -cr "/Applications/Tandem.app"
 ```
 
-### External monitor not responding
-1. Check connection type (USB-C works, HDMI doesn't)
-2. Verify m1ddc is installed: `which m1ddc`
-3. Test m1ddc directly: `m1ddc set luminance 50`
+**External monitor isn't responding:**
+1. Open the menu bar dropdown. Confirm the display is listed with a mode badge.
+2. If you expect DDC but see `Software` — DDC isn't available on that connection (HDMI, dock, or unsupported monitor). The software fallback works.
+3. If the display doesn't appear at all — unplug and replug; Tandem detects hotplug within a second.
 
-### Monitor not detected
-```bash
-m1ddc display list
-```
-Your monitor should appear in the list.
+**Gamma stays applied after a force quit:** Relaunch Tandem, set the slider to 100%, then quit cleanly. Or sleep + wake the Mac.
 
-## 🏗️ Building from Source
+## Build from source
 
 ```bash
 git clone https://github.com/aditya-madaan/BrightnessSync-Mac.git
@@ -117,34 +87,35 @@ cd BrightnessSync-Mac
 ./build.sh
 ```
 
-The built app will be in `build/BrightnessSync Mac.app`
+The built app lands in `build/Tandem.app`.
 
-## 📁 Project Structure
+## Project structure
 
 ```
-BrightnessSync-Mac/
+.
 ├── BrightnessSyncMac/
-│   ├── main.swift              # App entry point
-│   ├── AppDelegate.swift       # Menu bar UI + settings
-│   ├── BrightnessController.swift  # Brightness logic + sync
-│   ├── DDCControl.swift        # m1ddc wrapper
-│   ├── DisplayManager.swift    # Display detection
-│   └── Info.plist              # App configuration
-├── build.sh                    # Build script
+│   ├── main.swift                     App entry point
+│   ├── AppDelegate.swift              Menu bar + popover + settings UI
+│   ├── BrightnessController.swift     Sync logic, per-display calibration, routing
+│   ├── DDCControl.swift               m1ddc wrapper + probe
+│   ├── SoftwareDimController.swift    GPU gamma fallback
+│   ├── DisplayManager.swift           Display enumeration
+│   ├── KeyboardShortcutManager.swift  Global hotkeys via CGEventTap
+│   └── Info.plist
+├── build.sh                           Single-command build
 └── README.md
 ```
 
-## 📋 Requirements
+## Requirements
 
-- **macOS 12.0+** (Monterey, Ventura, Sonoma, Sequoia)
-- **Apple Silicon** (M1, M2, M3, M4)
-- **m1ddc** (`brew install m1ddc`)
-- **USB-C or DisplayPort** connection (not HDMI)
+- macOS 12.0 (Monterey) or later
+- Apple Silicon (M1, M2, M3, M4)
+- `m1ddc` (optional, enables real DDC: `brew install m1ddc`)
 
-## 📄 License
+## License
 
-MIT License - see [LICENSE](LICENSE)
+MIT — see [LICENSE](LICENSE).
 
-## 🙏 Credits
+## Credits
 
-- [m1ddc](https://github.com/waydabber/m1ddc) - DDC control for Apple Silicon
+- [m1ddc](https://github.com/waydabber/m1ddc) — DDC control on Apple Silicon

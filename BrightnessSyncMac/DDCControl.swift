@@ -1,130 +1,128 @@
 import Foundation
 import CoreGraphics
 
-/// Controls external monitors via m1ddc command-line tool
+/// Controls external monitors via the m1ddc command-line tool.
+/// Operates on m1ddc display indices (1-based). Callers resolve CGDirectDisplayIDs
+/// to m1ddc indices via name matching against `getDetectedDisplays()`.
 class DDCControl {
-    
-    private var brightnessCache: [CGDirectDisplayID: Float] = [:]
+
     private let m1ddcPath = "/opt/homebrew/bin/m1ddc"
-    
-    // Throttling for slider dragging
+
+    // Throttling for slider dragging (shared across all displays — m1ddc serializes anyway).
     private var pendingWorkItem: DispatchWorkItem?
     private let queue = DispatchQueue(label: "com.brightness.sync.ddc", qos: .userInitiated)
     private var lastExecutionTime: Date = .distantPast
     private let minInterval: TimeInterval = 0.05
-    
-    /// Gets list of external displays detected by m1ddc
-    func getDetectedDisplays() -> [(index: Int, name: String, uuid: String)] {
-        guard let output = runM1DDCWithOutput(args: ["display", "list"]) else {
-            return []
+
+    /// True if m1ddc is installed at the expected path.
+    var isM1DDCInstalled: Bool {
+        FileManager.default.fileExists(atPath: m1ddcPath)
+    }
+
+    /// Detected m1ddc display (parsed from `m1ddc display list`).
+    struct DetectedDisplay {
+        let index: Int
+        let name: String
+    }
+
+    /// Returns list of external displays detected by m1ddc.
+    func getDetectedDisplays() -> [DetectedDisplay] {
+        guard let output = runM1DDCWithOutput(args: ["display", "list"]) else { return [] }
+
+        var displays: [DetectedDisplay] = []
+        for line in output.components(separatedBy: "\n") {
+            // Format: [N] DisplayName (UUID)
+            guard let bracket = line.range(of: #"^\[(\d+)\]\s+"#, options: .regularExpression),
+                  let indexMatch = line.range(of: #"\d+"#, options: .regularExpression, range: bracket),
+                  let index = Int(line[indexMatch]) else { continue }
+
+            // Skip built-in (shows as "(null)").
+            if line.contains("(null)") { continue }
+
+            let name = line
+                .replacingOccurrences(of: #"^\[\d+\]\s+"#, with: "", options: .regularExpression)
+                .replacingOccurrences(of: #"\s+\([^)]+\)$"#, with: "", options: .regularExpression)
+                .trimmingCharacters(in: .whitespaces)
+
+            displays.append(DetectedDisplay(index: index, name: name))
         }
-        
-        var displays: [(index: Int, name: String, uuid: String)] = []
-        let lines = output.components(separatedBy: "\n")
-        
-        for line in lines {
-            // Parse format: [1] DisplayName (UUID)
-            if let match = line.range(of: #"\[(\d+)\]\s+(.+?)\s+\(([^)]+)\)"#, options: .regularExpression) {
-                let fullMatch = String(line[match])
-                
-                // Extract components
-                if let indexMatch = fullMatch.range(of: #"\[(\d+)\]"#, options: .regularExpression),
-                   let index = Int(fullMatch[indexMatch].dropFirst().dropLast()) {
-                    
-                    // Skip index 1 which is usually the built-in display shown as "(null)"
-                    let name = line.contains("(null)") ? "Built-in Display" : 
-                               line.replacingOccurrences(of: #"\[\d+\]\s+"#, with: "", options: .regularExpression)
-                                   .replacingOccurrences(of: #"\s+\([^)]+\)$"#, with: "", options: .regularExpression)
-                    
-                    if !line.contains("(null)") {
-                        displays.append((index: index, name: name.trimmingCharacters(in: .whitespaces), uuid: ""))
-                    }
-                }
-            }
-        }
-        
         return displays
     }
-    
-    /// Sets brightness with throttling (for slider dragging)
-    func setBrightness(for display: Display, level: Float) {
+
+    /// Probes whether DDC actually works for a specific m1ddc display.
+    /// Reads luminance (read-only — no value change). Returns false if the call
+    /// errors, times out, or returns no valid number.
+    func probeDisplay(index: Int) -> Bool {
+        guard isM1DDCInstalled else { return false }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: m1ddcPath)
+        process.arguments = ["get", "luminance", "-d", String(index)]
+
+        let outPipe = Pipe()
+        let errPipe = Pipe()
+        process.standardOutput = outPipe
+        process.standardError = errPipe
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            return false
+        }
+
+        if process.terminationStatus != 0 { return false }
+
+        let stderr = String(data: errPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        if stderr.localizedCaseInsensitiveContains("failure") { return false }
+
+        let stdout = String(data: outPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        let trimmed = stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        return Int(trimmed) != nil
+    }
+
+    /// Sets brightness for a specific m1ddc display (throttled for slider drags).
+    func setBrightness(m1ddcIndex: Int, level: Float) {
         let value = Int(max(0, min(100, level * 100)))
-        brightnessCache[display.id] = level
-        
+
         pendingWorkItem?.cancel()
-        
-        let timeSinceLastExecution = Date().timeIntervalSince(lastExecutionTime)
-        
-        if timeSinceLastExecution >= minInterval {
-            executeBrightnessCommandForAll(value: value)
+
+        let elapsed = Date().timeIntervalSince(lastExecutionTime)
+        if elapsed >= minInterval {
+            executeSet(value: value, index: m1ddcIndex)
         } else {
             let workItem = DispatchWorkItem { [weak self] in
-                self?.executeBrightnessCommandForAll(value: value)
+                self?.executeSet(value: value, index: m1ddcIndex)
             }
             pendingWorkItem = workItem
-            let delay = minInterval - timeSinceLastExecution
-            queue.asyncAfter(deadline: .now() + delay, execute: workItem)
+            queue.asyncAfter(deadline: .now() + (minInterval - elapsed), execute: workItem)
         }
     }
-    
-    /// Sets brightness immediately without throttling (for keyboard sync)
-    func setBrightnessImmediate(for display: Display, level: Float) {
+
+    /// Sets brightness immediately for a specific m1ddc display (no throttle — used for keyboard sync).
+    func setBrightnessImmediate(m1ddcIndex: Int, level: Float) {
         let value = Int(max(0, min(100, level * 100)))
-        brightnessCache[display.id] = level
-        
         pendingWorkItem?.cancel()
-        executeBrightnessCommandForAll(value: value)
+        executeSet(value: value, index: m1ddcIndex)
     }
-    
-    /// Execute brightness command for ALL detected external displays
-    private func executeBrightnessCommandForAll(value: Int) {
+
+    private func executeSet(value: Int, index: Int) {
         lastExecutionTime = Date()
-        
-        guard FileManager.default.fileExists(atPath: m1ddcPath) else {
-            print("BrightnessSync: m1ddc not found - install with: brew install m1ddc")
+        guard isM1DDCInstalled else {
+            print("Tandem: m1ddc not found at \(m1ddcPath)")
             return
         }
-        
-        // Get all detected displays
-        let displays = getDetectedDisplays()
-        
-        if displays.isEmpty {
-            // Fallback: try without display index (controls default display)
-            print("BrightnessSync: No external displays detected, trying default...")
-            _ = runM1DDC(args: ["set", "luminance", String(value)])
-            return
-        }
-        
-        // Set brightness for each detected external display
-        for display in displays {
-            print("BrightnessSync: Setting display \(display.index) (\(display.name)) to \(value)%")
-            _ = runM1DDC(args: ["set", "luminance", String(value), "-d", String(display.index)])
-        }
+        _ = runM1DDC(args: ["set", "luminance", String(value), "-d", String(index)])
     }
-    
-    func getBrightness(for display: Display) -> Float? {
-        if let cached = brightnessCache[display.id] {
-            return cached
-        }
-        
-        if let output = runM1DDCWithOutput(args: ["get", "luminance"]) {
-            let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
-            if let value = Int(trimmed) {
-                let level = Float(value) / 100.0
-                brightnessCache[display.id] = level
-                return level
-            }
-        }
-        return 0.5
-    }
-    
+
+    @discardableResult
     private func runM1DDC(args: [String]) -> Bool {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: m1ddcPath)
         process.arguments = args
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
-        
+
         do {
             try process.run()
             process.waitUntilExit()
@@ -133,20 +131,18 @@ class DDCControl {
             return false
         }
     }
-    
+
     private func runM1DDCWithOutput(args: [String]) -> String? {
-        guard FileManager.default.fileExists(atPath: m1ddcPath) else {
-            return nil
-        }
-        
+        guard isM1DDCInstalled else { return nil }
+
         let process = Process()
         process.executableURL = URL(fileURLWithPath: m1ddcPath)
         process.arguments = args
-        
+
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = FileHandle.nullDevice
-        
+
         do {
             try process.run()
             process.waitUntilExit()

@@ -36,7 +36,7 @@ class KeyboardShortcutManager {
             },
             userInfo: Unmanaged.passUnretained(self).toOpaque()
         ) else {
-            print("BrightnessSync: ❌ Failed to create event tap - check Accessibility permissions")
+            print("Tandem: ❌ Failed to create event tap - check Accessibility permissions")
             return
         }
         
@@ -46,9 +46,9 @@ class KeyboardShortcutManager {
         CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
         
-        print("BrightnessSync: ✓ Keyboard shortcuts active")
-        print("BrightnessSync:   Option+] = Brightness Up")
-        print("BrightnessSync:   Option+[ = Brightness Down")
+        print("Tandem: ✓ Keyboard shortcuts active")
+        print("Tandem:   Option+] = Brightness Up")
+        print("Tandem:   Option+[ = Brightness Down")
     }
     
     func stop() {
@@ -101,7 +101,7 @@ class KeyboardShortcutManager {
         }
         
         if isBrightnessUp || isBrightnessDown {
-            print("BrightnessSync: Shortcut detected - \(isBrightnessUp ? "UP" : "DOWN")")
+            print("Tandem: Shortcut detected - \(isBrightnessUp ? "UP" : "DOWN")")
             
             DispatchQueue.main.async { [weak self] in
                 self?.adjustBrightness(up: isBrightnessUp)
@@ -116,14 +116,14 @@ class KeyboardShortcutManager {
     
     private func adjustBrightness(up: Bool) {
         guard let controller = brightnessController else {
-            print("BrightnessSync: No controller")
+            print("Tandem: No controller")
             return
         }
         
         let current = controller.getBrightness()
         let newLevel = up ? min(1.0, current + brightnessStep) : max(0.0, current - brightnessStep)
         
-        print("BrightnessSync: \(up ? "↑" : "↓") → \(Int(newLevel * 100))%")
+        print("Tandem: \(up ? "↑" : "↓") → \(Int(newLevel * 100))%")
         controller.setBrightness(newLevel)
         
         DispatchQueue.main.async { [weak self] in
