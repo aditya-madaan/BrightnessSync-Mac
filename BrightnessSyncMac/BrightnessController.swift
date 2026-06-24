@@ -74,9 +74,14 @@ class BrightnessController {
     // MARK: - Public API
 
     func startMonitoring() {
-        brightnessMonitorTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+        // Schedule in .common mode so the poll keeps firing during NSMenu tracking
+        // — without this, F1/F2 presses while the menu is open don't update the slider
+        // until the menu closes (Timer.scheduledTimer defaults to .default mode only).
+        let timer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
             self?.checkForBrightnessChange()
         }
+        RunLoop.main.add(timer, forMode: .common)
+        brightnessMonitorTimer = timer
     }
 
     func stopMonitoring() {

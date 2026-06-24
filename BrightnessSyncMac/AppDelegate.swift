@@ -33,9 +33,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrightnessChangeDelegate {
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let btn = statusItem.button {
-            if let img = NSImage(systemSymbolName: "sun.max.fill", accessibilityDescription: "Brightness") {
+            // Custom Tandem template glyph (two-display motif). Bundle resource
+            // loaded via NSImage(named:) auto-picks @1x/@2x by display scale and
+            // the template flag lets macOS tint it for light/dark menu bars.
+            if let img = NSImage(named: "MenuBarIcon") {
+                img.isTemplate = true
                 btn.image = img
-                btn.image?.isTemplate = true
+            } else if let img = NSImage(systemSymbolName: "sun.max.fill",
+                                        accessibilityDescription: "Brightness") {
+                img.isTemplate = true
+                btn.image = img
             } else {
                 btn.title = "☀️"
             }

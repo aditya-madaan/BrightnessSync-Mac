@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bgl" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7faff"></stop><stop offset="0.55" stop-color="#e3ecfb"></stop><stop offset="1" stop-color="#cfe0fa"></stop>
+    </linearGradient>
+    <linearGradient id="mg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7fd0ff"></stop><stop offset="0.55" stop-color="#2f6dff"></stop><stop offset="1" stop-color="#143cc7"></stop>
+    </linearGradient>
+    <linearGradient id="mgr" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3f7bff"></stop><stop offset="1" stop-color="#102a8c"></stop>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="1024" height="1024" rx="228" fill="url(#bgl)"></rect>
+  <g transform="translate(248 248) scale(4.26)">
+    <rect x="10" y="26" width="46" height="72" rx="15" fill="url(#mg)"></rect>
+    <rect x="68" y="26" width="46" height="72" rx="15" fill="url(#mgr)" opacity="0.4"></rect>
+    <line x1="62" y1="18" x2="62" y2="106" stroke="#3f7bff" stroke-width="3" stroke-dasharray="2 9" stroke-linecap="round"></line>
+  </g>
+</svg>
