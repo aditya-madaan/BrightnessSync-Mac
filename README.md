@@ -58,7 +58,7 @@ You can see the chosen mode for each display in the menu bar dropdown — `DDC` 
 
 ## Calibration
 
-Open ☀ → **Calibration Settings…** for per-display sliders:
+Open the Tandem menu bar icon → **Calibration Settings…** for per-display sliders:
 
 - **MacBook Display** — defaults 20% min, 80% max. Prevents the built-in display from going pitch black or blinding-white at slider extremes.
 - **Each external** — defaults 20% min, 100% max. Raise the minimum if 0% feels too dim; lower the maximum to cap the display's brightness ceiling.
