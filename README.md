@@ -35,7 +35,7 @@ Grab `Tandem.dmg` from [Releases](../../releases), drag the app into `/Applicati
 xattr -cr "/Applications/Tandem.app"
 ```
 
-Open Tandem from Applications. A ☀ icon appears in your menu bar.
+Open Tandem from Applications. The Tandem icon (a two-display glyph) appears in your menu bar.
 
 ## Usage
 
