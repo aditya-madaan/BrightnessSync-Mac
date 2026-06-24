@@ -10,7 +10,7 @@ class DDCControl {
 
     // Throttling for slider dragging (shared across all displays — m1ddc serializes anyway).
     private var pendingWorkItem: DispatchWorkItem?
-    private let queue = DispatchQueue(label: "com.brightness.sync.ddc", qos: .userInitiated)
+    private let queue = DispatchQueue(label: "com.tandem.brightness.ddc", qos: .userInitiated)
     private var lastExecutionTime: Date = .distantPast
     private let minInterval: TimeInterval = 0.05
 

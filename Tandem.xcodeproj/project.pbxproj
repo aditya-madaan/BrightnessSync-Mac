@@ -17,14 +17,14 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		A1000010 /* BrightnessSync.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BrightnessSync.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1000010 /* Tandem.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Tandem.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000011 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		A1000012 /* BrightnessController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrightnessController.swift; sourceTree = "<group>"; };
 		A1000013 /* DDCControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DDCControl.swift; sourceTree = "<group>"; };
 		A1000014 /* DisplayManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplayManager.swift; sourceTree = "<group>"; };
 		A1000015 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A1000016 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		A1000017 /* BrightnessSync.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BrightnessSync.entitlements; sourceTree = "<group>"; };
+		A1000017 /* Tandem.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Tandem.entitlements; sourceTree = "<group>"; };
 		A1000020 /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
 		A1000021 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
@@ -45,7 +45,7 @@
 		A1000000 = {
 			isa = PBXGroup;
 			children = (
-				A1000018 /* BrightnessSync */,
+				A1000018 /* Tandem */,
 				A1000019 /* Frameworks */,
 				A100000F /* Products */,
 			);
@@ -54,12 +54,12 @@
 		A100000F /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A1000010 /* BrightnessSync.app */,
+				A1000010 /* Tandem.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		A1000018 /* BrightnessSync */ = {
+		A1000018 /* Tandem */ = {
 			isa = PBXGroup;
 			children = (
 				A1000011 /* AppDelegate.swift */,
@@ -68,9 +68,9 @@
 				A1000014 /* DisplayManager.swift */,
 				A1000015 /* Assets.xcassets */,
 				A1000016 /* Info.plist */,
-				A1000017 /* BrightnessSync.entitlements */,
+				A1000017 /* Tandem.entitlements */,
 			);
-			path = BrightnessSync;
+			path = Tandem;
 			sourceTree = "<group>";
 		};
 		A1000019 /* Frameworks */ = {
@@ -85,9 +85,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		A100000A /* BrightnessSync */ = {
+		A100000A /* Tandem */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A1000030 /* Build configuration list for PBXNativeTarget "BrightnessSync" */;
+			buildConfigurationList = A1000030 /* Build configuration list for PBXNativeTarget "Tandem" */;
 			buildPhases = (
 				A100000B /* Sources */,
 				A100000D /* Frameworks */,
@@ -97,9 +97,9 @@
 			);
 			dependencies = (
 			);
-			name = BrightnessSync;
-			productName = BrightnessSync;
-			productReference = A1000010 /* BrightnessSync.app */;
+			name = Tandem;
+			productName = Tandem;
+			productReference = A1000010 /* Tandem.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -117,7 +117,7 @@
 					};
 				};
 			};
-			buildConfigurationList = A1000004 /* Build configuration list for PBXProject "BrightnessSync" */;
+			buildConfigurationList = A1000004 /* Build configuration list for PBXProject "Tandem" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -130,7 +130,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				A100000A /* BrightnessSync */,
+				A100000A /* Tandem */,
 			);
 		};
 /* End PBXProject section */
@@ -282,20 +282,20 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = BrightnessSync/BrightnessSync.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Tandem/Tandem.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = BrightnessSync/Info.plist;
+				INFOPLIST_FILE = Tandem/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.brightness.sync;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tandem.brightness;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -307,20 +307,20 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = BrightnessSync/BrightnessSync.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Tandem/Tandem.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = BrightnessSync/Info.plist;
+				INFOPLIST_FILE = Tandem/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.brightness.sync;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tandem.brightness;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -330,7 +330,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		A1000004 /* Build configuration list for PBXProject "BrightnessSync" */ = {
+		A1000004 /* Build configuration list for PBXProject "Tandem" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A1000040 /* Debug */,
@@ -339,7 +339,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A1000030 /* Build configuration list for PBXNativeTarget "BrightnessSync" */ = {
+		A1000030 /* Build configuration list for PBXNativeTarget "Tandem" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A1000042 /* Debug */,

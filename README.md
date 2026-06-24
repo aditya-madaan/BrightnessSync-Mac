@@ -82,8 +82,8 @@ xattr -cr "/Applications/Tandem.app"
 ## Build from source
 
 ```bash
-git clone https://github.com/aditya-madaan/BrightnessSync-Mac.git
-cd BrightnessSync-Mac
+git clone https://github.com/aditya-madaan/Tandem.git
+cd Tandem
 ./build.sh
 ```
 
@@ -93,7 +93,7 @@ The built app lands in `build/Tandem.app`.
 
 ```
 .
-├── BrightnessSyncMac/
+├── Tandem/
 │   ├── main.swift                     App entry point
 │   ├── AppDelegate.swift              Menu bar + popover + settings UI
 │   ├── BrightnessController.swift     Sync logic, per-display calibration, routing

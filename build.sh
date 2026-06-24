@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Build script for BrightnessSync Mac
+# Build script for Tandem (Mac)
 # This creates a proper app bundle and DMG for distribution
 
 set -e
@@ -21,7 +21,7 @@ mkdir -p "$APP_BUNDLE/Contents/MacOS"
 mkdir -p "$APP_BUNDLE/Contents/Resources"
 
 # Copy Info.plist
-cp "$PROJECT_DIR/BrightnessSyncMac/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
+cp "$PROJECT_DIR/Tandem/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
 
 # Generate App Icon (icns) using iconutil (works with Command Line Tools)
 echo "🎨 Generating App Icon..."
@@ -30,13 +30,13 @@ mkdir -p "$ICONSET_DIR"
 
 # Copy icons from xcassets to iconset folder with correct names for iconutil
 # iconutil expects names like: icon_16x16.png, icon_16x16@2x.png, etc.
-cp "$PROJECT_DIR/BrightnessSyncMac/Assets.xcassets/AppIcon.appiconset/"*.png "$ICONSET_DIR/"
+cp "$PROJECT_DIR/Tandem/Assets.xcassets/AppIcon.appiconset/"*.png "$ICONSET_DIR/"
 
 # Convert to icns
 iconutil -c icns "$ICONSET_DIR" -o "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
 
 # Copy custom Resources (menu bar template glyph @1x and @2x)
-cp "$PROJECT_DIR/BrightnessSyncMac/Resources/"*.png "$APP_BUNDLE/Contents/Resources/"
+cp "$PROJECT_DIR/Tandem/Resources/"*.png "$APP_BUNDLE/Contents/Resources/"
 
 # Compile Swift files
 echo "📦 Compiling Swift sources..."
@@ -44,7 +44,7 @@ swiftc -sdk $(xcrun --show-sdk-path) \
        -target arm64-apple-macosx12.0 \
        -O \
        -o "$APP_BUNDLE/Contents/MacOS/$EXECUTABLE_NAME" \
-       "$PROJECT_DIR/BrightnessSyncMac/"*.swift \
+       "$PROJECT_DIR/Tandem/"*.swift \
        -framework AppKit \
        -framework IOKit \
        -framework CoreGraphics \
